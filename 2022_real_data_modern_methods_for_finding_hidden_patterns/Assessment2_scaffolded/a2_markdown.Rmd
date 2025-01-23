@@ -1,0 +1,592 @@
+---
+title: "Assessment 2 - Scaffolded Case Study and Data"
+author: "A1844790 - Dylan Rohan"
+date: "09/03/2022"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("tidyverse")
+library(tidyverse)
+#remove.packages("rlang")
+#install.packages("rlang")#
+#install.packages("skimr")
+library(skimr)
+library(gmodels)
+#install.packages("ggplot2")
+library(ggplot2)
+library(rsample)
+library(recipes)
+#install.packages("tidymodels")
+library(tidymodels)
+library(workflows)
+library(caret)
+```
+
+## Data Clean
+
+Step 1:
+
+```{r}
+# Reading in data
+affairs_df <- read.csv("affairs.csv")
+affairs_df <- as_tibble(affairs_df)
+
+# Child, Religious, Sex, and Rate are ordinal/nomial so it makes sense to store them as factors.  
+affairs_df$religious <- as_factor(affairs_df$religious)
+affairs_df$rate <- as_factor(affairs_df$rate)
+affairs_df$child <- as_factor(affairs_df$child)
+affairs_df$sex <- as_factor(affairs_df$sex)
+
+# Printing first 6 rows
+head(affairs_df, 6)
+```
+
+Step 2:
+
+The outcome variable is '*affair* ' - 0 indicating they had never had an affair and a 1 indicating they'd had at least one affair.,
+
+The predictor variables are the gender (*sex*), age (*age*), number of years of marriage (*ym*), whether they have children (*child*), how devout they consider themselves to be to their religion (*religious*), their level of education (*education*), their occupation according to the Hollinghead classification (*occupation*), and how happy they are in their marriage (*rate*).
+
+Step 3:
+
+```{r}
+# Skim() is great for an overview but very cumbersome to view 
+skim(affairs_df)
+```
+
+There are currently: - No missing values - 601 rows (but three will be removed below) - Variables are in their correct type.
+
+Double check:
+
+```{r}
+# There are no NA values
+sum(is.na(affairs_df))
+# Clear
+
+# Skim doesn't show you what values are present (spelling mistakes, invalid values, etc.)
+unique(affairs_df$affair)
+unique(affairs_df$sex)
+unique(affairs_df$age)
+unique(affairs_df$ym)
+unique(affairs_df$child)
+unique(affairs_df$religious)
+unique(affairs_df$education)
+unique(affairs_df$occupation)
+unique(affairs_df$rate)
+# No errors identified 
+# Clear
+
+# Skim doesn't show you conditional errors
+# Does their age and years married make sense?
+filter(affairs_df, age <= 17.5)
+filter(affairs_df, age <= 17.5 & ym==10)
+```
+
+One 17.5 year old woman had been married for 10 years? Married since the age of 7.5?
+
+This is an american magazine that started in 1967. The woman was highly religious so I suppose it is not unheard of given the context, but the american census suggests the law requires you be at least 14 to marry. Which would make this an unlawful marriage and if the United states of America did not recognize the union I see no reason why I should. <https://www.cdc.gov/nchs/data/series/sr_21/sr21_021.pdf>
+
+```{r}
+# remove unlawful child marriages
+filter(affairs_df, (age-ym) < 14 )
+clean <- affairs_df %>% slice(-c(which(affairs_df$age <= 17.5 & affairs_df$ym==10, arr.ind=TRUE)))
+# Removed
+
+# Is their level of education feasibly possible?
+filter(clean, age < 23, education == 20)
+filter(clean, age < education)
+```
+
+You Couldn't attend school from the womb in the 1960s to my knowledge. In the American system You generally start school around 3 or 4, which means you can't be younger than 23 and have a PhD without being some kind of savant. And a savant is by definition extremely different from the population.
+
+```{r}
+clean <- subset(clean, age>education)
+# Removed
+
+# checking for oddities between participant's education and occupation
+filter(clean, occupation == 7, education < 15 )
+# Checking for oddities around the Hollinghead classification for occupation and education levels. 5 people had highly skilled jobs, but did not have any tertiary education. But unions and regulations might have been less stringent in the 1960s?
+# Questionable, but clear
+
+# Checking how many rows have been removed
+nrow(affairs_df)-nrow(clean)
+```
+
+Three rows removed due to impossible or unlawful outliers considering the 1960s context. This took the initial 601 subjects down to 598, the 9 columns containing the observations for each subject are still present.
+
+step 4:
+
+```{r}
+# Setting the binary values to yes/no factor values
+clean$affair <- ifelse(clean$affair == 1, "yes", "no")
+clean$affair <- as.factor(clean$affair)
+
+# Counting values
+sum(clean$affair == "yes")
+sum(clean$affair == "no")
+
+head(clean)
+```
+
+The tibble now has 150 'yes' values and 448 'no' values in place of their binary counterparts. All Character values have been converted to factors. However, occupation and education variables concern me because education is not linear over time, it's exponential. The same can be said for the lifestyle that comes with each level of the Hollinghead classification system. If I have time I will see what effect changing these to factors has on the model.
+
+Step 5:
+
+```{r}
+skim(clean)
+sum(clean$affair == "yes")
+sum(clean$child == "yes")
+mean(clean$age)
+mean(as.integer(clean$religious))
+```
+
+1)  How many people responded to having an affair? 150
+2)  How many responded to having children? 429
+3)  What is the mean age of respondents? 32.56
+4)  What is the mean response on the religious scale? 3.12 (So approximately 3)
+5)  Do you think you should normalize the numeric variables? Yes
+6)  Why/Why not? Because we have different ranges for each variable. Larger values will have more weighting but may not be better predictors. By normalizing we create uniform scales which will allow r to better interpret variable importance.
+
+## Exploratory Data Analysis
+
+Step 1: female proportionality of response to affair
+
+```{r}
+# For women responding No
+count(filter(clean, affair == "no", sex == "female"))/count(filter(clean, affair == "no"))
+
+```
+
+```{r}
+# For women responding yes
+count(filter(clean, affair == "yes", sex == "female"))/count(filter(clean, affair == "yes")) 
+```
+
+```{r}
+# Added after tute:
+CrossTable(clean$affair, clean$sex)
+```
+
+74.9% of participants indicated they'd never had an affair. 52.3% of participants were female. 53.79% of participants that indicated they'd never had an affair were female. 48% of participants that indicated they'd had an affair were female.
+
+Gender does not appear to be a great indicator of whether or not someone will have an affair, its almost as likely as a coin flip.
+
+Step 2: parenthood status proportionality of response to affair
+
+```{r}
+# For parents responding yes
+count(filter(clean, affair == "yes", child == "yes"))/count(filter(clean, affair == "yes"))
+```
+
+```{r}
+# For women responding no
+count(filter(clean, affair == "no", child == "no"))/count(filter(clean, affair == "no"))
+```
+
+```{r}
+# Added after tute:
+CrossTable(clean$affair, clean$child)
+```
+
+71.7% of participants indicated they had children, and the remaining 28.3% indicated they did not. 82% of people that did have an affair indicated they were parents. 31.70% of people that did not have an affair indicated they were childless.
+
+In the 1960s, it appears having children increased the likely hood of having an affair. Perhaps due to the added economic, physical and mental stresses that family life would have entailed. Parental status appears to be a good predictor of whether or not someone will have an affair.
+
+Step 3:
+
+```{r}
+ggplot(clean, aes(x = affair, y=as.integer(rate), fill=affair)) +
+  geom_boxplot(outlier.shape = 22, outlier.fill="#1b98e0") +
+  scale_fill_manual(values = c("#1b98e0", "violet"), breaks=waiver()) +
+  ggtitle("Figure 1: How loyal and disloyal participants rated \ntheir marriages") +
+  xlab("Respons to question 'Have you had an affair?'") +
+  ylab("rate\n\n(1=unhappy, 5=Very happy)\n")
+```
+
+In both cases the median sits on a rate value of 4. However, the spread for the loyal cohort was much smaller (between 3 and 5 with a few outliers). Whereas the disloyal cohort had a spread from the minimum to the maximum rate values (1 to 5). It is difficult to comment on the reliability of 'rate' as a predictor because their is a good deal of whisker overlap between populations with the limited amount of data we have. You can see however that the disloyal cohort skews to lower/unhappy values while the loyal cohort skews to higher/very happy values.
+
+I would also like to note that we should consider that there may be a bias in the readership; the type of people reading this magazine may be skewing the data as we only have data from that population. Magazine cost, accessibility, regularity of purchase, etc. could be used to scrutinize these effects but that is outside the scope of this assignment.
+
+Step 4:
+```{r}
+#..prop.. is also stat(prop) now
+ggplot(clean, 
+       aes(x = sex, group =  rate, fill = rate)) +
+  geom_bar( aes(y = stat(prop)), 
+           stat = "count", 
+           position = position_dodge()) +
+  scale_fill_brewer()+
+  geom_text( aes(label = scales::percent(round(stat(prop),2)), 
+                y = stat(prop)), 
+            stat = "count", 
+            vjust = -.5, 
+            position = position_dodge(.9),
+            size = 1.8,
+            color = "white") +
+  scale_y_continuous(limits = c(0,1),
+                     labels = scales::percent) +
+  facet_grid(~affair) +
+  ggtitle("Figure 2: The proportions for how participants rated their \nmarriage for each sex-affair response pair" ) +
+  xlab("Respons to question 'Have you had an affair?'") +
+  ylab("Proportion of rate response ") +
+  theme_dark()
+```
+
+The population of men and the population of women who indicated they'd had an affair both have a multi-modal distribution. The males appear to have more of a left skew and the women more of a right skew; indicating that disloyal men are happier in their marriages than the disloyal women. Sadly, similar trends are visible in the loyal male and female cohorts. 
+
+This metric has a lot of unknown variation in it as participants have different tolerance and threshold levels. Its also worth mentioning we have no record of why they cheated or with what gender their affair was with. Perhaps a better metric would have been a ranking of causes as defined by us instead of a list of arbitrary tolerance/thresholds for each individual.
+
+Step 5:
+```{r}
+ggplot(clean, aes(x=education, y=..prop..)) +
+  geom_bar() +
+  facet_wrap(~affair) +
+  scale_y_continuous(limits = c(0,0.3),
+                     labels = scales::percent) +
+  geom_text( aes(label = scales::percent(round(stat(prop),2)), 
+                y = stat(prop)), 
+            stat = "count", 
+            vjust = -.5, 
+            position = position_dodge(.9),
+            size = 3)+
+  ggtitle("Figure 3: The proportion of participant education for the loyal and \ndisloyal cohorts" ) +
+  xlab("Years of education") +
+  ylab("Proportion of participants ") +
+  theme_bw()
+```
+
+There is a great deal of similarity between the cohorts, years of education does not appear to hold much information regarding whether or not someone will have an affair. Perhaps it would do better to also indicate the discrepancy of education between the married couple and also investigate the education level of the person they had the affair with.
+
+I've already mentioned my dissatisfaction with treating education as a linear integer when the content is expected to be exponential as people develop and learning becomes faster. We also can't assume that someone is more intelligent because they've studied longer. Education influences a great many factors outside of itself so, fundamentally, I think it is better to interpret this as a category and not a quantity. I do not know if this will result in R modelling any differently, but it seems a valid argument. Something else to consider is the population of disloyal participants is far lower than the loyal participants (which is great, but perhaps leads to some differences in variance magnitudes between the groups).
+
+## Split and Preprocess
+
+step 1:
+
+```{r}
+# Setting seed for reproducibility
+set.seed(1234)
+# Indexing each row
+index <- sample(1:nrow(clean))
+repro_clean <-clean[index, ]
+repro_clean
+```
+
+step 2:
+
+```{r}
+# Setting seed for reproducibility
+set.seed(1234)
+
+# Creating training and test sets
+clean_split <- initial_split(repro_clean)
+
+clean_training <- training(clean_split)
+head(clean_training, 6)
+```
+
+```{r}
+clean_testing <- testing(clean_split)
+head(clean_testing, 6)
+```
+
+```{r}
+nrow(clean_training)
+```
+
+```{r}
+nrow(clean_testing)
+help("step_downsample")
+```
+
+There are 448 rows in the training set and 150 in the testing set.
+
+Step 3:
+
+The step_downsample() function is used to remove rows in a data set to ensure levels are interpreted equally. If you have strings as nominal values in your data set, this function will prevent them from being interpreted as ordinal. Levels are interpreted based on the ASCII depending on the locale at the time, so there would have been inadvertent levels present in all our qualitative predictors and indeed are:
+
+```{r}
+levels(affairs_df$religious) #"1" "2" "3" "4" "5"
+levels(affairs_df$rate)      #"1" "2" "3" "4" "5"
+levels(affairs_df$child)     #"no"  "yes"
+levels(affairs_df$sex)       #"male"   "female"
+```
+
+step 4:
+
+```{r}
+# Preparing recipe
+affair_recipe <- recipe(affair ~ ., data = clean_training) %>%
+  themis::step_downsample(affair) %>%
+  step_dummy(sex, child, religious, rate) %>% #for nominal data 
+  step_normalize(all_predictors())%>%
+  prep()
+
+affair_recipe
+```
+
+step 5:
+
+```{r}
+# Preprocessing the training set
+affair_training_prepro <- affair_recipe %>%
+  juice()           # Using clean_training data from recipe
+affair_training_prepro
+
+#Preprocessing the testing set
+affair_test_prepro <- affair_recipe %>%
+  bake(clean_testing)
+affair_test_prepro
+```
+
+step 6:
+
+```{r}
+skim(affair_training_prepro)
+```
+
+There are 112 yes and 112 no values from the down-sampling, thus removing any unwanted weighting. The factor variables have been converted to numerical dummy variables (categorical variables now indicate the absence (0) or presence (1) of an influence). The mean is effectively on 0 and the standard deviation is now exactly x1 from normalizing the data. The step_normalize function uses the training data to make an estimate of the mean and standard deviation. It subtracts the mean from the data to center it, and then divides the values by the standard deviation in order to scale it; effectively an estimated z-score.
+
+## Tune and Fit a Model
+
+step 1:
+
+```{r}
+# Model specification
+model_spec <- nearest_neighbor(mode = "classification", 
+                               engine = "kknn", 
+                               neighbors = tune())
+
+# fitting model
+affair_knn <- model_spec %>%
+  fit(affair~., data = affair_training_prepro)
+```
+
+step 2:
+
+```{r}
+# Setting seed for reproducibility 
+set.seed(1234)
+index <- sample(1:nrow(affair_training_prepro))
+prepro_training <- affair_training_prepro[index, ]
+head(prepro_training)
+
+affair_cv <- vfold_cv( data = prepro_training, v = 5, starta=affair)
+affair_cv
+#affair_cv_resamples <- fit_resamples(model_spec, affair ~ ., affair_cv)
+```
+
+step 3:
+
+```{r}
+k_grid <- grid_regular(neighbors(c(5,75)),levels = 25)
+k_grid
+```
+
+Step 4:
+
+```{r}
+tune_k <- tune::tune_grid(model_spec,
+                          preprocess = affair~.,
+                          resamples = affair_cv,
+                          grid = k_grid)
+```
+
+Step 5:
+
+```{r}
+tune_df <- collect_metrics(tune_k)
+tune_df
+```
+
+```{r}
+# Separating accuracy and roc_aus metrics
+accuracy_df <- tune_df[tune_df$.metric=="accuracy",]
+roc_auc_df <- tune_df[tune_df$.metric=="roc_auc",]
+
+# Plotting the mean accuracy for each value of k
+ggplot(accuracy_df, aes(x = neighbors, y = mean)) +
+  geom_point() +
+  geom_line() +
+  ggtitle("Figure 4: Comparisson of accuracy values for each model" ) +
+  xlab("Number of neighbours, k, used") +
+  ylab("Mean accuracy") +
+  geom_text(data = filter(accuracy_df, neighbors == 31), 
+            aes(x = neighbors,
+                label =  paste("k=",neighbors,",\naccuracy =", round(mean, 2))),
+            nudge_y = 0.008,
+            size = 4) + 
+  geom_point(data = filter(accuracy_df, neighbors ==31),
+             aes(x = neighbors,y = mean, color = "red")) +
+  scale_y_continuous(limits = c(0.6, 0.675)) +
+  theme_bw() +
+  theme(legend.position = "none")
+```
+
+```{r}
+
+# Plotting the mean roc_auc for each value of k
+ggplot(roc_auc_df, aes(x = neighbors, y = mean)) +
+  geom_point() +
+  geom_line() +
+  ggtitle("Figure 5: Comparisson of the areas under the ROC curves for each\n model" ) +
+  xlab("Number of neighbours, k, used") +
+  ylab("Mean area under the curve") +
+  geom_text(data = filter(roc_auc_df, neighbors == 75), 
+            aes(x = neighbors,
+                label =  paste("k=",neighbors,",\nAUC =", round(mean, 4))),
+            nudge_y = 0.008,
+            nudge_x = -10,
+            size = 4) + 
+  geom_point(data = filter(roc_auc_df, neighbors ==75),
+             aes(x = neighbors,y = mean, color = "red")) +
+  scale_y_continuous(limits = c(0.6, 0.675)) +
+  theme_bw()+
+  theme(legend.position = "none")
+```
+
+The best mean accuracy was when k = 31, the best mean area under the ROC curve was found at k = 75.
+
+Step 6:
+
+```{r}
+highest_accuracy <- tune_k %>%
+  select_best(metric = "accuracy")
+highest_accuracy # 31
+
+highest_AUC <- tune_k %>%
+  select_best(metric = "roc_auc")
+highest_AUC # 75
+```
+
+step 7:
+
+```{r}
+knn_final <-finalize_model(model_spec, highest_accuracy)
+knn_final
+```
+
+step 8:
+
+```{r}
+knn_final <- finalize_model(model_spec, highest_accuracy) %>%
+  fit(affair~., data = affair_training_prepro)
+```
+
+## Evaluation
+
+step 1:
+
+```{r}
+class_prediction <- knn_final %>%
+  predict(new_data = affair_test_prepro ) 
+
+head(class_prediction, 6)
+```
+
+step 2:
+
+```{r}
+class_prediction <- class_prediction %>%
+  bind_cols(affair_test_prepro %>% 
+               select( affair))
+
+head(class_prediction, 6)
+```
+
+Step 3:
+
+```{r}
+conf_matrix <- class_prediction %>%  
+  conf_mat(truth = affair, estimate = .pred_class ) 
+conf_matrix
+```
+
+Step 4:
+
+```{r}
+sens(class_prediction, affair, .pred_class)
+```
+
+The sensitivity of the model is 0.6518. Sensitivity is a measure of how accurately the model predicts a positive result. In this case, the model was able to predict a positive case (someone being disloyal) a little bit better than if you flipped a coin to decide. This will be detrimental as many of the people marked as disloyal by the model indicated that they had been loyal. Of course, disloyal people might be expected to lie on such a survey but we cannot assume the worst of people. That being the case, the model does not have the predictive power to fairly and compassionately determine the loyalty of a person.
+
+```{r}
+spec(class_prediction, affair, .pred_class)
+```
+
+The sensitivity of the model was 0.6053. Specificity is a measure of how reliably the model can predict a negative case. Again, the model is only marginally better than flipping a coin to decide. It has less harmful impacts in reality as it doesn't accuse anyone of being disloyal, but by the same taken it also allows disloyal partners to slip through the cracks.
+
+Step 5:
+
+```{r}
+class_prediction <- class_prediction %>%
+  bind_cols(predict(object = knn_final,
+                    new_data = affair_test_prepro,
+                    type= "prob")) 
+head(class_prediction, 6)
+```
+
+Step 6:
+
+```{r}
+class_prediction %>%
+  roc_curve(truth = affair, .pred_yes) %>%
+  autoplot() +
+  ggtitle("Figure 6: The ROC curve for the finalised \nmodel predicting disloyalty") +
+  theme(plot.title = element_text(size = 10))
+```
+
+This model is not predicting disloyalty well. The line of y = x is the equivalent of a completely random classification. This figure indicates that our predictors do not provide enough information nor strong enough associations with the outcome variable to make meaningful predictions. Ideally we would like to see the chart reach up to the top left where the true positive rate is high and the false positive rate is low. Even altering the chart to represent a model that predicts loyalty does not reach that area (figure 8).
+
+```{r}
+class_prediction %>%
+  roc_curve(truth = affair, .pred_no) %>%
+  autoplot() +
+  ggtitle("Figure 6: The ROC curve for the finalised \nmodel predicting loyalty") +
+  theme(plot.title = element_text(size = 10))
+```
+
+Step 7:
+
+```{r}
+class_prediction %>%
+  roc_auc(truth = affair, .pred_yes)
+```
+
+```{r}
+class_prediction %>%
+  roc_auc(truth = affair, .pred_no)
+```
+
+A completely random classification model would produce an area under the curve of 0.5. This further demonstrates that this model (with an area under the ROC curve of 0.36) is lacking predictive power. The same model predicting instead for loyalty is better, at 0.64, but still lacking in predictive power.
+
+step 8:
+
+```{r}
+# creating a tibble of the form seen in affairs_df
+#a)
+bono_prediction <- tibble(sex = factor("male", levels=c("female", "male")),
+                         age = 47,
+                         ym = 15,
+                         child = factor("no", levels=c("no", "yes")),
+                         religious = factor("2", levels=c("1","2", "3", "4", "5", "6", "7")),
+                         education = 20,
+                         occupation = 6,
+                         rate = factor("5", levels=c("1","2", "3", "4", "5")))
+head(bono_prediction)
+
+# b)
+bono_prepro <- affair_recipe %>%
+  bake(bono_prediction)
+head(bono_prepro)
+# c)
+knn_final %>%
+  predict(new_data = bono_prepro, type = "class") %>%
+  head()
+```
+Step 8.d)
+We have predicted that Bono is loyal to his partner. I'm sure they'd be thrilled to know, alas we will not be telling them. I have serious concerns about the validity of the prediction and the accuracy of the model. The model is quite competitive with a random classifier, certainly not something a data scientist wants to see or promote. 
+
+Furthermore, having the ability to predict something of this nature does not give us the right to create conflict unnecessarily. Our actions could very well make the situation worse, or even dangerous for that individual. To do so would be to leap into George Orwell's 1984, where an organization has complete control of every outcome and emotion and there is no tolerance of emotion or privacy.   

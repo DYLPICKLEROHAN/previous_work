@@ -1,0 +1,9 @@
+"0","ggplot(pulitzer, aes(prizes_9014, log(average_of_04_and_13)))+
+  geom_point()+
+  geom_smooth(aes(group=1), method=""lm"", se=FALSE, col = ""black"")+
+  labs( title = ""The Linear Regression Model produced by \npul_model data"",
+        x =""Prize count"",
+        y = "" ln(Average circulation between 2004 and 2013)"")
+"
+"2","`geom_smooth()` using formula 'y ~ x'
+"

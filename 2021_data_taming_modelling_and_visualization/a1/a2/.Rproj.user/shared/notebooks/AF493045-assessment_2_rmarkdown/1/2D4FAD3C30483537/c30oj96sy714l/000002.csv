@@ -1,0 +1,6 @@
+"0","ggplot(pulitzer, aes(prizes_9014, log(average_of_04_and_13)))+
+  geom_point()+
+  geom_smooth(aes(group=1), method=""lm"", se=FALSE, col = ""black"")
+"
+"2","`geom_smooth()` using formula 'y ~ x'
+"

@@ -1,0 +1,6 @@
+"0","#2.3
+ggplot(ac, aes(x = runs_, col=team))+geom_bar()
+"
+"2","Warning:"
+"2"," Removed 101 rows containing non-finite values (stat_count).
+"

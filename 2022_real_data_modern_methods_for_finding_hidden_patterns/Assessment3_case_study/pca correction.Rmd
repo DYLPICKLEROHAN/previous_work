@@ -1,0 +1,1117 @@
+---
+title: "ASSESSMENT 3 – CASE STUDY AND DATA ANALYSIS"
+output: word_document
+---
+
+```{r, opts_chunk$set(echo=FALSE)}
+
+library("tidyverse")
+library("dataMeta")
+library("caret")
+library("skimr")
+library("ggcorrplot")
+library("tidymodels")
+library("vip")
+```
+
+## Summary to CEO
+
+Hello Mr Tuke,
+
+Regarding the predicted sales of 'The Fatal Empire'. With the information we have about it's title length, number of platforms released on, specific platform of release, game genre, year of release, and the sales figures of Japan, Europe, and other countries, our random forest model predicts sales of 1.92 million copies.
+
+Taking the data as it is, and assuming the historical data is still representative, we can be over 90% sure in the model's accuracy. That being said, there are a few areas for improvement, but I'll cc you in on the manager's report were that will be discussed further.
+
+Regards, Dylan
+
+## Managers report
+
+### Managers report
+
+1.  **Aim and Hypothesis:**
+
+The purpose of this report is to outline the process undertaken to predict the North American sales figure of the PS4 release of 'The Fatal Empire' using data available online via kaggle that was originally sourced from www.vgchatz.com. The data provided included information regarding a games:
+
+-    Name,
+
+-   Year of release
+
+-   Platform of release
+
+-   Game genre
+
+-   Sales figures of North America,
+
+-   Sales figures of Japan
+
+-   Sales figures of Europe
+
+-   Sales figures for the total of all other countries.
+
+From this data, two additional pieces of information were acquired, the title length, as well as the number of platforms a game had been released on as it was hypothesised that human behaviour relating to these two factors would be informative (Title length may influence a potential customers likely hood of picking up a game in store, and more platforms influences word-of-mouth advertising as well as the community available to a game).
+
+Two types of predictive models were trialed, A Lasso regression and a random forest. Their accuracy was measured and function carefully examined.
+
+1.  **Data Cleaning**
+
+In this phase:
+
+Summary of what has been accomplished below:
+
+-   A duplicate was removed
+-   An approach to verify the Name and Publisher values was provided
+-   The Year variable was properly formatted and NA values addressed. 270 NA values were reduced to 133 by setting them equal to the average year for rows with the same title. Five of the remaining titles had a year in their title which made for a good approximation of its release year. The remaining values were given the mean year for rows with the same Platform. This was considered a better approximation on a case by case basis than simply setting them all equal to the global mean year.
+-   Some of the sales figures were representing weekly sales, these have been converted to annual figures where obvious. Of those, six were for US/American sales which would relate to the Other_Sales value. As there is no way to easily multiply this column (because it contains multiple countries and not just America) by 52.14, they have been left as is with the knowledge that this will influence the accuracy of the model
+-   Two incorrect Platform values (as indicated in the Name column) were corrected
+
+Issues Identified but not fixed:
+
+-   As mentioned above, the US weekly sales rows remain an issue
+
+-   I've not changed the names to reflect the corrections made (this remains a source of error for the title length variable)
+
+-   There is no simple way to merge data pertaining to the same game because there is no linking variable/ID. And even if there were, it would need to be done individually and manually as some values would be written over in the process.
+
+1.  **Exploratory Data Analysis (EDA)**
+
+In this phase, the information most relevant to predicting North American sales was identified. After careful examination of all variables it was found that the title length, Platform, Year, Genre, all Sales figures, and the number of platforms a game had been released on were all considered informative for the prediction of North American sales.
+
+These assertions were identified through simple bivariate analysis, principle component analysis, and parallel coordinate plots.. The parallel coordinate plot found that there was a relationship between platform and region; Nintendo platforms generally selling better in Japan and 'Sony' platforms generally selling better outside of Japan. A similar trend could be found for some publishers, but it's likely just that some publishers produce games for Nintendo platforms/ Japanese audiences. The principle component analysis found that the numerical variables contained the most amount of variance in the data, but that is only saying that no specific category contained much variation on its own. The principle component analysis offered the best evidence at this stage that the additional variables would make good predictors.
+
+Their importances were also confirmed after the fact through variable importance analyses.
+
+1.  **Data Processing**
+
+The data was modified as required. In this case, that meant transforming sales figures (by log(x+1)) and normalizing all countable variables. Platform and genre were also treated in a manner that allowed a computer to interpret each category.
+
+The data was then split into training and testing sets. This is done so that the model can be tested on data that was not intrinsically part of its production.
+
+1.  **Model Fitting and Model Evaluation**
+
+The model fitting stage involves building four models and measuring their accuracy through out-of-bag error measures (this involves comparing
+
+). A fifth model was created in an attempt to improve/ verify the variable importance measures obtained by the best model, but it provided no benefit in terms of prediction accuracy.
+
+The models created were:
+
+1.  LASSO regression model - Initial variables
+
+2.  LASSO regression model - initial variables + (Title length, platforms available to game)
+
+3.  Random forest model - Initial variables
+
+4.  Random forest model - initial variables + (Title length, platforms available to game)
+
+5.  Random forest model - initial variables + (Title length, platforms available to game) + preprocessing steps to reduce categories and correlation
+
+There are a few assumptions involved in the LASSO regression model that were verified in this section. However the relevance of the LASSO models was lacking. Of the above list, it was the fourth model that had the best accuracy as it was found to have the highest r-squared value and the lowest route mean squared
+
+## Statisticians report
+
+A detailed analysis of the data intended for a fellow statistician. The analysis should include any code, figures and tables appropriately captioned. This should thoroughly detail your analysis process such that it is independently reproducible by another statistician. [85 marks]
+
+## Data Clean
+
+### Part 1 - Import and skim
+
+```{r}
+# Importing data
+vgsales <- read.csv("vgsales.csv")
+head(vgsales,6)
+```
+
+```{r}
+# Initial skim of Data
+skim(vgsales)
+# No missing values here
+```
+
+The data has nine columns, with 16,598 rows. There are currently five character variables and 4 numeric variables. The variables include the name of the game (Name), the platform the game can be played on (Platform), the year the game was released (Year), the genre of the game (Genre), the publisher of the game (Publisher), as well as the number of copies sold in North America, Europe, Japan, and the total for all remaining countries (NA_Sales, EU_Sales, JP_Sales, Other_Sales, respectively). No missing values were made apparent [in this step]{.underline}.
+
+## Data Clean
+
+### Part 2 - A Good Clean and Tidy
+
+Summary of what has been accomplished below:
+
+-   A duplicate was removed
+-   An approach to verify the Name and Publisher values was provided
+-   The Year variable was properly formatted and NA values addressed. 270 NA values were reduced to 133 by setting them equal to the average year for rows with the same title. Five of the remaining titles had a year in their title which made for a good approximation of its release year. The remaining values were given the mean year for rows with the same Platform. This was considered a better approximation on a case by case basis than simply setting them all equal to the global mean year.
+-   A curiosity regarding Wii Sport was examined and validated
+-   Some of the sales figures were representing weekly sales, these have been converted to annual figures where obvious. Of those, six were for US/American sales which would relate to the Other_Sales value. As we cannot simply multiply this column (because it contains multiple countries and not just America) by 52, they have been left as is with the knowledge that this will influence the accuracy of the model
+-   Two incorrect Platform values were corrected
+
+Issues Identified but not fixed:
+
+-   As mentioned above, the US weekly sales rows remain an issue
+
+-   I've not changed the names to reflect the corrections made (because Name is not a predictor)
+
+-   I could not find a simple way to merge data pertaining to the same game because there is no linking variable/ID. And even if there were, I would still need to go through each manually as some values would be written over in the process
+
+```{r}
+# Check for Duplicates
+filter(vgsales, duplicated(vgsales) == TRUE)
+filter(vgsales, Name == "Wii de Asobu: Metroid Prime")
+clean <- distinct(vgsales)
+# One duplicate removed
+
+# Check for other mistakes/inconsistencies:
+# Name check:
+name_vgsales <- clean %>%
+  group_by(Name) %>%
+  tally(sort=TRUE)        # currently 11,492 Game titles
+# Need to compare values against a Master list
+
+# Platform check:
+platform_vgsales <- clean %>%
+  group_by(Platform) %>%
+  tally(sort=TRUE)        # 31 Platforms 
+head(platform_vgsales,5) 
+# Clear
+
+# Publisher check
+publishers_vgsales <- clean %>%
+  group_by(Publisher) %>%
+  tally(sort=TRUE)        # 579 Publishers
+head(publishers_vgsales,5)
+# Need to compare values against Master list
+
+      # Check 579 publishers against list found on wiki and at:            https://www.kaggle.com/datasets/andreshg/videogamescompaniesregions?resource=download) for quick spell-check I create a Master list to compare Publisher values against: 
+dev1 <- read.csv("dev1.csv")
+dev2 <- read.csv("dev2.csv")
+wiki1 <- read_csv("table-2.csv")
+dev1_publishers <- dev1$Developer
+dev2_publishers <- dev2$Developer
+wiki_publishers <- wiki1$Publisher
+publisher_check <-  c(dev1_publishers, dev2_publishers, wiki_publishers)
+publisher_check <- unique(publisher_check)
+length(publisher_check) # 1535 Publishers to check against
+publisher_check_df <- data.frame(matrix(unlist(publisher_check),
+                                        nrow=length(publisher_check),
+                                        byrow=TRUE))
+      # Comparing lists
+publishers_vgsales$Publisher %in% publisher_check_df$matrix.unlist.publisher_check...nrow...length.publisher_check...
+
+# With more resources you could verify from a 'master list', mine is incomplete and I have no way of knowing if it has errors itself. But its a proof of concept as to how you could go about checking the Qualitative variables.
+
+# Year Check:
+unique(clean$Year)
+clean <- clean %>%
+  mutate(Year = na_if(Year, "N/A"), Year = na_if(Year, ""), Year = na_if(Year, " ") )
+clean$Year[is.nan(clean$Year)]<-NA
+sum(is.na(clean$Year))
+clean$Year <- as.numeric(clean$Year)
+# Has 270 NA values and is now numeric
+
+# Could just give the average if a game is released  on multiple platforms 
+na_rows <- filter(clean, is.na(Year))
+na_titles <- c(na_rows$Name)
+# If a game is released on multiple platforms, let NA equal the average of the year 
+for(i in na_titles){
+  if(nrow(filter(clean, grepl(i, Name))) > 1){
+    clean[clean$Name == i, "Year"] <- round(mean(filter(clean, grepl(i, Name))[,3], na.rm = TRUE),0)
+  }
+}
+filter(clean, is.na(Year))
+# Now only 133 NA values
+
+# If the year is in the title, that's a good indication's likely to be within a year of the true value. These 5 titles below only appear in the data once, so we can alter by Name:
+name_indicates_year <- filter(clean, grepl(" 20", Name))
+Name_to_Year <- filter(name_indicates_year, !grepl("", Year))
+clean[clean$Name == "wwe Smackdown vs. Raw 2006", "Year"] <- 2006
+clean[clean$Name == "NFL GameDay 2003", "Year"] <- 2003
+clean[clean$Name == "Tour de France 2011", "Year"] <- 2011
+clean[clean$Name == "Sega Rally 2006", "Year"] <- 2006
+clean[clean$Name == "Football Manager 2007", "Year"] <- 2006
+filter(clean, is.na(Year))
+# Now only 128 Na values
+
+# The most accurate substitution for the remaining values would be the mean value for the year for games on that platform type... this may take a second
+na_key <- group_by(clean, Platform) %>%
+    summarize(m = round(mean(Year, na.rm=TRUE))) # Average year for each platform
+# Make a new row for 'mean year by platform', then back-fill with ifelse statement
+clean <- clean %>%
+  left_join(na_key, by = "Platform")
+clean$Year <- ifelse(is.na(clean$Year), clean$m, clean$Year)
+clean <- select(clean, -m)
+head(filter(clean, is.na(Year)))
+head(clean)
+```
+
+```{r}
+# Genre Check:
+unique(clean$Genre)
+genre_vgsales <- clean %>%
+  group_by(Genre) %>%
+  tally(sort=TRUE) 
+# All clear
+
+# Sales Checks:
+max(clean$NA_Sales)
+max(clean$EU_Sales)
+max(clean$JP_Sales)
+max(clean$Other_Sales)
+head(filter(clean, NA_Sales <0 | NA_Sales > 20 ))
+wii_sport <- filter(clean, NA_Sales <0 | NA_Sales > 40 )
+# Wikipedia confirms Wii Sport actually did have 82 million copies sold by 2017
+# Clear
+
+# Is total world wide sales equal to the sum of all sales?
+## filter(clean, (NA_Sales + EU_Sales + JP_Sales + Other_Sales) != Global_Sales)
+# Apparently we're not using the Global column seen on kaggle in this assignment...
+
+# Identified a re-occurring issue in sales:
+dplyr::filter(clean, grepl("weekly", Name))
+dplyr::filter(clean, grepl("Weekly", Name))
+  # 20 rows report only weekly sales figures (multiply by 52)
+
+# Altering all weekly Japanese sales figures to be annual
+    # Creating list to sort
+weekly_to_annual_all_rows <- filter(clean, grepl("weekly", Name) | grepl("Weekly", Name))
+weekly_to_annual_jp_rows <- filter(weekly_to_annual_all_rows,
+                                   grepl("JP", Name) | grepl("jp", Name)| grepl("Jp", Name))
+weekly_to_annual_titles <- c(weekly_to_annual_jp_rows$Name)
+    # looping through 
+for(i in weekly_to_annual_titles){
+  clean[clean$Name == i, "JP_Sales"] <- clean[clean$Name == i, "JP_Sales"]*52.14 # weeks per year  
+}
+
+# Investigating these other "weekly sales" figures
+filter(weekly_to_annual_all_rows, !grepl("JP", Name) & !grepl("jp", Name)& !grepl("Jp", Name))
+dplyr::filter(clean, grepl("Tony Hawk's American Wasteland", Name)) # Unclear
+dplyr::filter(clean, grepl("NBA Live 06", Name)) # Unclear
+dplyr::filter(clean, grepl("Ratchet & Clank: Up Your Arsenal", Name)) # Unclear
+dplyr::filter(clean, grepl("Midnight Club 3", Name)) # Unclear
+dplyr::filter(clean, grepl("Pokemon Mystery Dungeon: Red", Name)) # Unclear 
+dplyr::filter(clean, grepl("The Urbz: Sims In the City", Name)) # Unclear
+# Doesn't appear to be marks for fixing this...
+```
+
+```{r}
+# As the name suggests, PS2 should be PS
+filter(clean, grepl("wrong", Name))
+clean[clean$Name=="Pachi-Slot Teiou: Golgo 13 Las Vegas (JP sales, but wrong system)", "Platform"] <- "PS"
+  # Will leave it in, but unsure if this was even sold globally
+clean[clean$Name=="Lunar 2: Eternal Blue(sales, but wrong system)", "Platform"] <- "SCD" # in 1994, the platform should be sega CD
+filter(clean, grepl("wrong", Name))
+
+# Identified a re-occurring issue in name:
+multirow <- dplyr::filter(clean, grepl("sales", Name))
+  # Some of the observations have been split into two rows.
+multirow <- filter(multirow, !grepl("all region sales", Name))
+multirow <- filter(multirow, !grepl("All region sales", Name))
+multirow <- filter(multirow, !grepl("All Region sales", Name))
+multirow <- filter(multirow, !grepl("All Region Sales", Name))
+multirow <- filter(multirow, !grepl("all regions sales", Name))
+multirow <- filter(multirow, !grepl("wrong system", Name))
+  # 132 problematic titles that represent at least as many rows but likely more.
+  # They each need to be assessed and bound to one row, or in the case of American/US/us sales, removed. But this is an enormous undertaking, for so few marks so....
+
+```
+
+## EDA
+
+### Part 1 - Initial variable inspections
+
+An exploratory data analysis was essential because it provided an opportunity to confirm the validity of our data and ensure it made sense. It would be pointless creating a model from inaccurate or non-nonsensical data. Depending on the model type selected, this phase generally assists in determining what transformations (if any) may be necessary and clearly identifies important characteristics/trends in each variable as well as relationships between variables.
+
+```{r}
+# Univariate analysis - Year
+  # Histogram
+ggplot(clean, aes(x = Year)) +
+  geom_histogram(fill="grey", colour ="black") +
+  ggtitle(str_wrap("Figure 1.2:The multimodal, left-skewed nature of the data with known Year values", 45) ) +
+  xlab("Year") +
+  ylab("Frequency") +
+  theme_minimal()
+
+  # Boxplot
+ggplot(clean, aes(x = Year)) +
+  geom_boxplot(fill = "grey") +
+  ggtitle(str_wrap("Figure 1.1: 50% of the data has a Year value between 2003 and 2010, data prior 1993 appear to be considered outliers", 45 )) +
+  xlab("Year") +
+  ylab("") +
+  theme_minimal()
+
+  # Summary statistics
+summary(clean$Year)
+```
+
+**Year**
+
+The data sits on a domain of 1980 to 2020, with the interquartie range from 2003 to 2010. It is multi-modal with very few games listed prior to the mid-90's or in the last few years; suggesting that data collection over the entire period has been very inconsistent. The left skew is not what one might expect to see when game development and play has been on the rise over the last few years. This data has been sourced from a public website, perhaps it has seen a decline in users since 2010 resulting in less frequent additions.
+
+The data appears to be a poor representation of historical trends. As copies sold in North America is the outcome variable and not the dollar value, we could ignore the year entirely. However, this leads to a bit of a dangerous assumption. It assumes that wages have grown with inflation and the same proportion of the market can afford to buy a copy no matter the year. It also assumes population sizes (customer population size specifically) have been consistent. Essentially, it removes the 'timeline' element and the relationships observed in time (more on this later).
+
+```{r}
+# Univariate analysis - NA_Sales
+  # Histogram
+ggplot(clean, aes(x = NA_Sales)) +
+  geom_histogram(fill="lightblue", colour ="blue") +
+  ggtitle(str_wrap("Figure 2.1: The right-skewed nature of the North american sales data", 45 )) +
+  xlab("North American sales (in millions)") +
+  ylab("Frequency") +
+  theme_minimal()
+
+  # Boxplot
+ggplot(clean, aes(x = NA_Sales)) +
+  geom_boxplot(fill = "lightblue") +
+  ggtitle(str_wrap("Figure 2.2: 50% of games sold less than 250,000 copies in North America, \nand anything larger than around 500,000 copies was considered an outlier",45)) +
+  xlab("North American sales (in millions)") +
+  ylab("") +
+  scale_x_continuous(limits = c(0, 1)) +
+  theme_minimal()
+
+  # Summary statistics
+summary(clean$NA_Sales)
+```
+
+**NA_Sales**
+
+The NA_Sales variable had a domain of 0 to 41.49 representing the number of copies sold in millions. The interquartile range was from 0 to 0.24 million. The mean number of copies sold was 0.2642 million, but the median was only 0.08 million. The data has a uni-modal shape with a clear right skew when looking at the histogram. The boxplot makes it more apparent that there are many small modes resulting from outliers across the domain.
+
+```{r}
+# Univariate analysis - JP_Sales
+  # Histogram
+ggplot(clean, aes(x = JP_Sales)) +
+  geom_histogram(fill="green", colour ="black") +
+  ggtitle(str_wrap("Figure 3.1: The right-skewed nature of the Japanese sales data", 45) ) +
+  xlab("Japanese sales (in millions)") +
+  ylab("Frequency") +
+  theme_minimal()
+
+  # Boxplot
+ggplot(clean, aes(x = JP_Sales)) +
+  geom_boxplot(fill = "green") +
+  ggtitle(str_wrap("Figure 3.2: 50% of games sold less than 12,500  copies in Japan, and anything larger than \napproximately 25,000 copies was considered an outlier", 45)) +
+  xlab("Japanese sales (in millions)") +
+  ylab("") +
+  scale_x_continuous(limits = c(0, .1)) +
+  theme_minimal()
+
+  # Summary statistics
+summary(clean$JP_Sales)
+filter(clean, JP_Sales>108)
+```
+
+**JP_Sales**
+
+JP_Sales had a domain from 0 to 14.08 million copies, (this changed because I converted a weekly sales figure to an annual sales figure in the data cleaning phase). The Median value was 0.00, while the mean value was 0.08 million. Similar to North america, the data has a right skew with a dominant mode with many small modes that represent outliers as observed in the boxplot. The median value of 0 indicates that many of the games were not sold in Japan.
+
+```{r}
+#Univariate analysis - EU_Sales
+  # Histogram
+ggplot(clean, aes(x = EU_Sales)) +
+  geom_histogram(fill = "red", colour ="black") +
+  ggtitle(str_wrap("Figure 4.1: The right-skewed nature of the European sales data", 45)) +
+  xlab("European sales (in millions)") +
+  ylab("Frequency") +
+  theme_minimal()
+
+  # Boxplot
+ggplot(clean, aes(x = EU_Sales)) +
+  geom_boxplot(fill = "red") +
+  ggtitle(str_wrap("Figure 4.2: 50% of games sold less than 30,000 copies in Europe, and anything larger than around 65,000 copies was considered an outlier", 45)) +
+  xlab("European sales (in millions)") +
+  ylab("") +
+  scale_x_continuous(limits = c(0, .1)) +
+  theme_minimal()
+
+  # Summary Statistics
+ summary(clean$EU_Sales)
+```
+
+**EU_Sales**
+
+The EU_Sales data had a domain of 0 to 29.02 million. The median value was 0.02 million, while the mean was 0.15 million. Much like the other sales figures, this too has a dominant mode and a right skew with several smaller modes scattered across the domain in positions identified as outliers.
+
+```{r}
+# Univariate analysis - Other_Sales
+  # Histogram
+ggplot(clean, aes(x = Other_Sales)) +
+  geom_histogram(fill = "purple", colour ="black") +
+  ggtitle(str_wrap("Figure 5.1: The right-skewed nature of the Other sales data", 45 ) ) +
+  xlab("Sales in other countries (in millions)") +
+  ylab("Frequency") +
+  theme_minimal()
+  
+  # Boxplot
+ggplot(clean, aes(x = Other_Sales)) +
+  geom_boxplot(fill = "purple") +
+  ggtitle(str_wrap("Figure 5.2: Over 50% of games sold less than 25,000 copies in Other countries, and anything larger than around 50,000 copies was considered an outlier", 45 )) +
+  xlab("Sales in other countries (in millions)") +
+  ylab("") +
+  scale_x_continuous(limits = c(0, .1)) +
+  theme_minimal()
+
+  # Summary statistics
+summary(clean$Other_Sales)
+```
+
+**Other_Sales**
+
+The Other_Sales data had a domain of 0 to 10.57 million. Its mean value was 0.05 million while it's median was 0.01 million. And it's the same story once more, dominant mode, right skew, several outliers.
+
+## EDA
+
+### Part 2 - Improving the Information Exchange between Data and Model
+
+I expect the three most important predictors will be JP_Sales, EU_Sales, and Other_Sales because they represent the response to a game released in a given year on a given Platform of a given Genre; in a sense these variables contain latent information representing the other variables. While cultures, languages and preferences differ around the globe, a game worth buying in one part of the world is most likely worth buying in another:
+
+```{r}
+# Visualizing the relationship between NA_Sales against all sales variables
+  # Comparison of JP_Sales, EU_Sales, and Other_Sales relationships with NA_Sales
+sales_stats <- clean %>%
+  pivot_longer(cols = c(EU_Sales, JP_Sales, Other_Sales)) 
+library("ggpubr")
+ggplot(sales_stats, aes(x = NA_Sales, y = value, colour = name)) +
+  geom_point() +
+  geom_smooth(method=lm, se=FALSE) +
+  ggtitle(str_wrap("Figure 6.1: The positive relationship between historical North American sales and those observed in Europe, Japan, and other countries", 45))+
+  xlab("North American Sales (in millions")+
+  ylab("Sales (in millions)") +
+  theme_dark()
+
+  # NA_sales and EU_Sales
+ggplot(clean, aes(x = NA_Sales, y = EU_Sales)) +
+  geom_point(colour = '#F8766D', show.legend = FALSE) +
+  geom_smooth(colour = '#F8766D', method = lm, se=FALSE, show.legend = FALSE) +
+  ggtitle(str_wrap("Figure 6.2: The positive relationshi between historical North American and European sales", 45))+
+  xlab("North American Sales (in millions")+
+  ylab("European Sales (in millions)") +
+  theme_dark() +
+  ggpubr::stat_cor(aes(label = ..rr.label..), color = "red", geom = "label")
+
+  # NA_sales and JP_Sales  
+ggplot(clean, aes(x = NA_Sales, y = JP_Sales)) +
+  geom_point(colour = '#00BA38', show.legend = FALSE) +
+  geom_smooth(colour = '#00BA38', method=lm, se=FALSE, show.legend = FALSE) +
+  ggtitle(str_wrap("Figure 6.3: The positive relationship between historical North American and Japan sales", 45))+
+  xlab("North American Sales (in millions")+
+  ylab("Japanese Sales (in millions)") +
+  theme_dark() +
+  ggpubr::stat_cor(aes(label = ..rr.label..), color = "red", geom = "label")
+
+  # NA_sales and Other_Sales
+ggplot(clean, aes(x = NA_Sales, y = Other_Sales)) +
+  geom_point(colour = '#619CFF', show.legend = FALSE) +
+  geom_smooth(colour = '#619CFF', method=lm, se=FALSE, show.legend = FALSE) +
+  ggtitle(str_wrap("Figure 6.4: The positive relationshi between historical North American and all Other countries' sales", 45))+
+  xlab("North American Sales (in millions")+
+  ylab("All Other Sales (in millions)") +
+  theme_dark() +
+  ggpubr::stat_cor(aes(label = ..rr.label..), color = "red", geom = "label")
+```
+
+**Key predictors: EU_Sales, JP_Sales, and Other_Sales**
+
+There does appear to be a positive correlation between these sales figures and NA_Sales. European_Sales has a moderate positive relation, perhaps due to cultural similarities as touched on briefly above. The relationship between JP_Sales is weakly positive. When a game sells well in North America, it doesn't appear to do as well in Japan, which could be partially related to cultural differences but also to the amount of customers in each country. Perhaps there are just more people to sell to in North America. Other_Sales follows a similar trend to that of JP_Sales, but it has a stronger correlation.
+
+The right skew in the data should be addressed as a LASSO model is essentially at it's heart still a linear model. Linear models make four key assumptions:
+
+1.  linearity
+
+2.  Normality
+
+3.  Homoscedasticity
+
+4.  Independence
+
+In the case of a LASSO model specifically though, each term in the otherwise linear model equation is given a penalty that relates to it's importance. Essentially weighing each variable in the equation by importance, with a few being weighed by zero and effectiely removed. When it comes to the assumptions of A LASSO linear model it is far simpler:
+
+1.  linearity - a straight line is still the best model
+
+2.  Sparcity - only a small number of variables may be relevant
+
+3.  The Irrepresentable condition - the important variables are unrelated to the unimportant variables
+
+4.  The errors must have a finite variance and a mean of zero, but not necessarily be normally distributed <https://click.endnote.com/viewer?doi=10.9734%2Fbjmcs%2F2016%2F29533&token=WzMzOTQxOTgsIjEwLjk3MzQvYmptY3MvMjAxNi8yOTUzMyJd.NYzJY0PZUBb7vphORpVLYuubCcc>,
+
+The sales figures were transformed by log(x+1) in the modelling phase:
+
+```{r, fig.width=6,fig.height=5}
+sales_stats <- clean %>%
+  pivot_longer(cols = c(EU_Sales, JP_Sales, Other_Sales)) %>%
+  mutate(value=log(value+1))
+
+ggplot(sales_stats, aes(x = NA_Sales, y = value, colour = name)) +
+  geom_point() +
+  geom_smooth(method=lm, se=FALSE) +
+  ggtitle(str_wrap("Figure 6.5: The positive relationship between historical North American sales and those observed in Europe, Japan, and other countries after each variable has been transformed by log(x+1) \n(See correlations in figure 20)", 45))+
+  xlab("The log of (North American Sales (in millions) + 1)") +
+  ylab("The log of (Sales (in millions) + 1") +
+  theme_dark()
+```
+
+**Improvement of Information exchange in other variables:**
+
+**Name** - The [title length]{.underline}, [Title language]{.underline}, or [franchise indicators]{.underline} (such as ':', '-', 'II','2', reoccurring 'prefix' strings, etc.) is probably more informative than the exact String. The language indicates a proportion of the world that can effortlessly play the game and understand the title, and signs of a franchise/sequel indicate a pre-existing fan-base that will help drive sales. Longer titles might be less enticing to consumers; a trend observable in the data. The trend becomes less obvious when you include all the games, but when you take a subset (such as games that sell up to 5 million copies) you effectively remove pre-existing franchises and get a sense of how a new game with no pre-existing fan base sells. Also verified the assumption that no specific platform had guidelines regarding title length.
+
+```{r, fig.width=6,fig.height=5}
+# Finding Name length and total sales
+name_length <- clean %>%
+  mutate(total_sales = (NA_Sales+EU_Sales+JP_Sales+Other_Sales))%>%
+  group_by(Name,Platform, total_sales) %>%
+  tally() %>%
+  mutate(chr_length = nchar(Name))
+
+# Creating table
+name_length %>%
+  ungroup() %>%
+  select(c("Name", "chr_length")) %>%
+  head(26) %>%
+  knitr::kable(caption = "Table _: The number of characters in each title")
+
+              
+# Revealing any relationship between title length and sales
+ggplot(filter(name_length, total_sales < 5), aes(x = chr_length, y = total_sales)) +
+  geom_point(aes(colour = Platform), alpha=0.2, show.legend = FALSE) +
+  geom_smooth(se=FALSE)+
+  labs(title = str_wrap("Figure 7: The amount of sales observed compared to the length of the title for games that sold less than 5 million copies", 45),
+       x = "Number of characters in title",
+       y = "Total sales (in millions)") +
+  theme_minimal()
+```
+
+**Publisher** - Although this variable was not a predictor itself, it is worthwhile investigating for trends that might provide some inspiration for the model building phase. For instance, some Publishers (such as 'Nintendo') are also the producers of the console. The name alone does not give an indication of how well established the company is nor the fan base they have in terms of market share. We can get an estimate of this if we instead consider the average sales per game for each Publisher. Below I've prepared a plot to approximate the average proportion of market share each Publisher has:
+
+```{r, fig.width=6,fig.height=5}
+# Finding the total sales for each Publisher
+clean$Publisher <- as.factor(clean$Publisher)
+established <- clean %>%
+  mutate(publisher_sales = (NA_Sales+EU_Sales+JP_Sales+Other_Sales),
+         releases = 1) %>%
+  group_by(Publisher, publisher_sales, releases) %>%
+  tally() %>%
+  group_by(Publisher) %>%
+  summarise(releases = sum(releases),
+            publisher_sales = sum(publisher_sales)) %>%
+  mutate(estimated_market_share = ((publisher_sales/releases)/sum(publisher_sales)))
+
+# Creating table
+established %>%
+  ungroup() %>%
+  select(c("Publisher", "publisher_sales")) %>%
+  arrange(desc(publisher_sales) ) %>%
+  head(100) %>%
+  knitr::kable(caption = "Table _:The top 100 Publishers in terms of sales in millions")
+
+# Plotting the Publishers that produced more than 20 million sales
+ggplot(filter(established, estimated_market_share > 0.0001),
+       aes( x = estimated_market_share, y = fct_reorder(Publisher, estimated_market_share))) +
+  geom_point() +
+  ggtitle(str_wrap(" Figure 8: Using proportion of average sales per game for each publisher to signify brand establishment, top 50 Publishers", 45)) +
+  ylab("Publishers") +
+  xlab("Proportion of Average Sales per Game") +
+  theme_minimal()
+  
+```
+
+**Platform** - Some of the consoles are no longer circulated, failed to capture a significant proportion of the market, or no longer exist. The information they provide is not all that informative. But there is something to be said about leaving them in the model. There are patterns when it comes to technology adoption (innovators, early adopters, early majority, late majority, laggards) and if technology that is at the end of its [adoption curve]{.underline} were removed, then there is a risk the model won't detect those latent patterns. Whether or not such information will be provided is uncertain, however it's inclusion will alter probabilities/odds in a way that better represents reality. Below are the platforms that have a total of less than 100,000 sales, as the list is incomplete (does not contain every game released on that console over that period of time) the adoption curves are less apparent:
+
+```{r, fig.width=6,fig.height=5}
+# Finding the amount of sales per Platform over time
+meaningful_platform <- clean %>%
+  mutate(total_sales = (NA_Sales+EU_Sales+JP_Sales+Other_Sales))%>%
+  group_by(Platform, Year, total_sales) %>%
+  tally() %>%
+  summarise(platform_sales_for_year = sum(total_sales))
+
+# Creating table
+clean %>%
+  mutate(total_sales = (NA_Sales+EU_Sales+JP_Sales+Other_Sales))%>%
+  group_by(Platform, total_sales) %>%
+  tally() %>%
+  summarise(platform_sales_for_year = sum(total_sales)) %>%
+  knitr::kable(caption = "Table _: Sales made for each category of platform")
+
+# Plotting the above data set
+ggplot(filter(meaningful_platform, max(platform_sales_for_year)<30),
+       aes( x = Year, 
+            y = platform_sales_for_year,
+            colour = Platform)) +
+  geom_line() +
+  ggtitle(str_wrap("Figure 9: The consoles that never sold more than 30 million copies of any game between 1980 and 2020", 45)) +
+  ylab("Total sales (in millions)") +
+  xlab("Year") +
+  xlim(c(1980,2020)) +
+  theme_minimal()
+```
+
+**Year** - Useful in association with other variables like Genre, as it maps preference trends. (It might also be useful to measure the optimal release time for a sequel when taken in association with Name). It will most likely have more meaning as an interaction term than on its own. (see below and in the summary for more commentary on Year)
+
+```{r, fig.width=6,fig.height=5}
+# Finding the total amount of sales for each Genre over time
+historic_trend <- clean %>%
+  mutate(total_sales = (NA_Sales+EU_Sales+JP_Sales+Other_Sales))%>%
+  group_by(Genre, Year, total_sales) %>%
+  tally() %>%
+  summarise(total_sales = sum(total_sales))
+
+#Plotting the trends and consumer preferences in Genre over time
+ggplot(historic_trend, aes(x = Year, y = total_sales, colour = Genre)) +
+  geom_smooth(se=FALSE) +
+  facet_wrap(.~Genre) +
+  ggtitle(str_wrap("Figure 10: The total sales observed for each Genre between 1980 and 2020", 45)) +
+  ylab("Total sales (in millions)") +
+  xlab("Year") +
+  theme_dark()
+```
+
+This chart may be interpreted as indicating that all genres of game have been on the decline since around 2010. This is a deceptive plot because data acquisition has been irregular. Furthermore, the data itself is an incomplete list of all the games released/sold each year. This trend may still exist as a result of the growth of Apple and Android mobile gaming services, but that is not an assertion that can be made with the data on hand. Furthermore, no binary predictor indicating a growing or declining/stagnation of genre could be provided to estimate current market preferences as had been considered initially.
+
+**Platform** -There is more information that can be squeezed from the data. The number of platforms the game has been released on. There are two opposing strategies when it comes to economically producing a game:
+
+1.  Put all the money into creating a great game for one console, or
+
+2.  Create an okay game and split the the remaining funds for engineering it for each platform and the associated advertising costs.
+
+There are of course different budgets and trade-offs each Publisher has to decide on, and that leads to a certain degree of variation. However, the asertion that a wider fan base will increase sales because of the increased word of mouth and accessibility to game help/ community, etc seems to be fairly well identified in the data:
+
+```{r, fig.width=6,fig.height=5}
+# Finding the Number of platforms a game can be played on and its sales data
+platform_count <- clean %>%
+  mutate(total_sales = (NA_Sales+EU_Sales+JP_Sales+Other_Sales)) %>%
+  group_by(Name, total_sales) %>%
+  tally(sort = TRUE) %>%
+  summarise(total_sales = sum(total_sales), n=sum(n))
+
+# Plotting sales vs number of platforms the game can be played on
+ggplot(platform_count, aes(x = as.factor(n), y = (total_sales))) +
+  geom_boxplot() +
+  ggtitle(str_wrap("Figure 11: The total observed for games that appear on one or more different platforms", 45)) +
+  ylab("Total sales (in millions)") +
+  xlab("Number of platforms game can be played on") +
+  theme_minimal()
+
+filter(platform_count, n > 11) # it was 'Need for Speed: Most Wanted'
+
+# Preparing tibble to merge the potentially meaningful variable later
+platform_count <- platform_count[c("Name", "n")]
+platform_count$platforms_available_for_title <- platform_count$n
+platform_count$n <- NULL
+
+# Creating table
+platform_count %>%
+  ungroup() %>%
+  select(c("Name","platforms_available_for_title")) %>%
+  head(20) %>%
+  knitr::kable(caption = "Table _: An example of the platform counts for each title.")
+  
+```
+
+To summaries,
+
+-   Title length was more informative than the game Name. it is notable however that names had not been corrected prior to use and a few rows will have more characters than they should as a result of additions like "...(jp weekly sales)" (**exclude Name**, include Title_length)
+
+-   The Platform was included, despite the argument that the data should be subdivided to only include current platforms so as probabilities/odds could be better calculated to reflect the immediate present; however including them all leads to a more conservative prediction that accounts for early adopters in competing new platforms. (**Include Platform**)
+
+-   Year was included as it contained latent information. The consequences of its xclusion have been carefully considered. As the data provided is irregular, incomplete, and without any reasonable way to tell if its representative of reality from year to year in terms of proportion of games per platform or game genre sales, there is an argument to exclude Year and instead aim to make an 'average' prediction. Average in the sense that it would interpret every row as being equivalent in weight and relevance. However, the amount of latent information Year contains may justify aiming for a more relevant time-dependent prediction. comparing the accuracy of the two opposing models may be impossible as they effectively predict two different things; sales in today's climate, and a time-independent sales average. (**Include Year**)
+
+-   Genre had enough variation between locations for it to be an informative predictor as will be seen below. (**Include Genre**)
+
+-   The Publisher variable did not supply enough information on its own, and as the predictive model will not be given publisher as a predictor anyway, it had to be excluded. (**Exclude Publisher**)
+
+-   The sales in locations other than North America were informative and were included. (**Include EU_Sales, JP_Sales, and Other_sales**)
+
+-   There was so much variation in the data that the information provided by the Number of Platforms predictor is not as precise as I'd thought it might be, but it may have some predictive value. (**Try with Platform_count**)
+
+## Data Cleaning
+
+### Part 3 - Consolidating Data for the modelling pre-processing phase
+
+Below I have modified the data into the form that was taken into the next phase. Note: variables were not reduce until their inadequacy had been verified:
+
+```{r}
+# Defining new data frame and altering missing values
+vgsales_df <- clean %>%
+# Adding total sales
+  mutate(Total_sales = (NA_Sales+EU_Sales+JP_Sales+Other_Sales)) %>%
+# Adding title length
+  mutate(Title_length = nchar(Name)) %>%
+# Adding Publisher's Total Sales 
+  left_join(clean, established, by = c("Name","Platform","Year","Genre",
+                                       "Publisher","NA_Sales","EU_Sales",
+                                       "JP_Sales","Other_Sales")) 
+
+# Adding platform dominance, note: Uses entire time period 
+vgsales_df <- left_join(vgsales_df, meaningful_platform, by = c("Platform","Year")) 
+# Adding the Number of available platforms per game
+vgsales_df <- left_join(vgsales_df, platform_count, by = "Name")
+
+# Setting data types for all variables, regardless of inclusion
+vgsales_df$Name <- as.factor(vgsales_df$Name)  
+vgsales_df$Platform <- as.factor(vgsales_df$Platform) 
+vgsales_df$Year <- as.Date(as.character(vgsales_df$Year), format = "%Y")
+vgsales_df$Genre <- as.factor(vgsales_df$Genre)  
+vgsales_df$Publisher <- as.factor(vgsales_df$Publisher)
+vgsales_df$NA_Sales <- as.integer(vgsales_df$NA_Sales)
+vgsales_df$EU_Sales <- as.integer(vgsales_df$EU_Sales)
+vgsales_df$JP_Sales <- as.integer(vgsales_df$JP_Sales)
+vgsales_df$Other_Sales <- as.integer(vgsales_df$Other_Sales)
+vgsales_df$Total_sales <- as.integer(vgsales_df$Total_sales)
+vgsales_df$platform_sales_for_year<- as.integer(vgsales_df$platform_sales_for_year)
+vgsales_df$Title_length <- as.integer(vgsales_df$Title_length)
+vgsales_df$platforms_available_for_title <- as.integer(vgsales_df$platforms_available_for_title)  
+
+# Preview 
+head(vgsales_df, 6)
+
+# Final Skim
+skim(vgsales_df)
+```
+
+At this point there were 13 columns and 16,327 rows. One of the variables was of a date class, Four were factors and the remaining eight were numeric. The details of each can be viewed in the data dictionary provided below:
+
+```{r}
+# Creating Data dictionary
+variable_description <- c("The Name of the game", 
+                          "The Platform of the games release", 
+                          "The Year of release, please note that only the year is relevant. The day and month are not accurate.",
+                          "The Genre of the game",
+                          "The Publisher of the game",
+                          "The copies sold in North America (in millions)",
+                          "The copies sold in Europe (in millions)",
+                          "The copies sold in Japan (in millions)",
+                          "The copies sold in all other coutries (in millions)",
+"The sum of sales in North America, Europe, Japan, and Other",
+"The number of characters in the title",
+"The dominance of the platform as represented by the number of games sold on that platform for each year",
+"The number of platforms that game has been released on")
+
+variable_type <- c(1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0)
+                          
+linker <- build_linker(my.data = vgsales_df,
+                        variable_description = variable_description,
+                        variable_type = variable_type)
+
+data_dictionary <- build_dict(my.data = vgsales_df,
+                              linker = linker,
+                              option_description = NULL, 
+                              prompt_varopts = FALSE)
+
+knitr::kable(data_dictionary, caption = "The data dictionary")
+```
+
+## EDA
+
+### Part 2 - Inspecting the outcome and predictor variables
+
+***Is there any obvious natural grouping structure to the variables?***
+
+Some natural grouping structures are to be expected. For example, some game genres are more common on particular platforms or in particular regions, the sales in North America probably follow similar trends to whats observed in Europe but less similar to that in Japan, the year of release will likely group with the platform type, the year is also likely to group with the number of sales, etc. Parallel Coordinate Plots have been used to assess the natural grouping structures in the numerical data:
+
+```{r, fig.width=6,fig.height=5}
+# Providing an indexation code 
+vgsales_id <- vgsales_df %>%
+  mutate(id = row_number())
+head(vgsales_id)
+
+# Normalize Sales (removing range differences) then convert it to long format
+  # grouping best observed with z-scores 
+df_long <-  vgsales_id %>%
+  mutate(NA_Sales = scale(NA_Sales),
+         EU_Sales = scale(EU_Sales),
+         JP_Sales = scale(JP_Sales),
+         Other_Sales = scale(Other_Sales),
+         platform_sales_for_year = scale(platform_sales_for_year),
+         platforms_available_for_title = scale(platforms_available_for_title),
+         Title_length = scale(Title_length)) %>%
+  pivot_longer(cols = c(NA_Sales, EU_Sales, JP_Sales, Other_Sales, 
+                        Title_length, platform_sales_for_year,
+                        platforms_available_for_title)) 
+  
+
+# Parallel plot showing Platform groupings
+df_long %>%
+  ggplot(aes(x = name, y = value, colour = Publisher)) +
+  geom_line(aes(group = id), show.legend = FALSE) +
+  ggtitle(str_wrap("Figure 12.1:Parrallel coordinate plot to identify any Publisher groupings", 45)) +
+  xlab("\nVariables") +
+  ylab("Z-score") +
+  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  theme_minimal()
+```
+
+**Publisher groupings**
+
+There appeared to be natural grouping structures when it came to Publishers in different locations. The sales in japan seemed to be the opposite of those in Europe and North America. Platform_sales_for_year is uninformative because different publishers may make games for multiple platforms, there are no clear trends observed in platforms_available_for_title. There didn't appear to be any rules regarding title length from any Publisher as Publishers/colours didn't appear to stay below any specific value.
+
+```{r, fig.width=6,fig.height=5}
+# Parallel plot showing Name groupings
+df_long %>%
+  ggplot(aes(x = name, y = value, colour = Name)) +
+  geom_line(aes(group = id), show.legend = FALSE) +
+  ggtitle(str_wrap("Figure 12.2: Parrallele coordinate plot to identify any Name groupings", 45)) +
+  xlab("\nVariables") +
+  ylab("As percentage of maximum") +
+  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  theme_minimal()
+# IF TIME, CREATE BINARY FRANCHISE COLUMN 
+```
+
+**Name groupings**
+
+Nothing hidden in the name apart form maybe Japanese titles selling in Japan and English titles perhaps not selling as much. This was not directly useful, but for the sake of completeness and being thorough all avenues have been considered.
+
+```{r, fig.width=6,fig.height=5}
+# Clean up this next one a bit by grouping Platform manufacturers
+Plat_mnfctr <- read.csv("console_producer.csv") # Faster in excel
+Plat_mnfctr
+# Parallel plot showing Platform manufacturer groupings
+df_long %>%
+  left_join(Plat_mnfctr, by = "Platform") %>%
+  rename(Console_manufacturer = Producer) %>%
+  ggplot(aes(x = name, y = value, colour = Console_manufacturer))+
+  geom_line(aes(group = id)) +
+  ggtitle(str_wrap("Figure 12.3: Parrallele coordinate plot to identify any Console_manufacturer groupings", 45)) +
+  xlab("\nVariables") +
+  ylab("As percentage of maximum") +
+  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  theme_minimal()
+```
+
+**Platform groupings**
+
+Clearly 'Nintendo' sold far better in Japan, and 'Sony' did far better in the other locations. Unsurprisingly, platform_sales_for_year and platforms_available_for_title offer no meaningful information and, again, there doesn't appear to be any regulations regarding game title lengths for any particular console_manufacturer either.
+
+```{r, fig.width=6,fig.height=5}
+# Parallel plot showing Year groupings
+df_long %>%
+  ggplot(aes(x = name, y = value, colour = as.factor(Year))) +
+  geom_line(aes(group = id), show.legend = FALSE) +
+    ggtitle(str_wrap("Figure 12.4: Parrallele coordinate plot to identify any Year groupings", 45)) +
+  xlab("\nVariables") +
+  ylab("As percentage of maximum") +
+  scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  theme_minimal()
+```
+
+**Year groupings**
+
+With a more detailed analysis, year groupings may be uncovered as a result of wage growth, inflation, and delayed population growth (delayed because babies don't play video-games) from year to year with, but it isn't apparent in this chart. Platform_sales_for_year, platforms_available_for_title, and title lengths dis not appear to have obvious natural grouping structures with Year either.
+
+***Is a PCA analysis worthwhile?***
+
+Principle component analysis, PCA, is useful when there is multi-colinearity, lots of variables, or if you want to remove noise or compress the data. It enables identification of the most, and least, important variables early on so that the variables best suited for predicting the outcome are well understood prior to pre-processing.
+
+Two PCAs were computed, the first with all the additional predictor variables and the second with just those provided in the CSV:
+
+```{r, fig.width=6,fig.height=5}
+# Start with the initial variables
+  # Remove Name, only useful as a factor if we categorise by franchise
+  # Remove publisher as we can't predict with it
+  # Total sales has no predictive information
+ vgsales_df_vars <- select(vgsales_df, c(Platform, Genre, NA_Sales, EU_Sales,
+                                         JP_Sales, Other_Sales, Title_length,
+                                         platforms_available_for_title,
+                                         Year))
+ 
+# Recipe for PCA
+recipe_PCA <- recipe(NA_Sales ~., data = vgsales_df_vars ) %>%  
+  step_log(JP_Sales, EU_Sales, Other_Sales, offset = 1) %>% #Account for skew
+  step_log(all_outcomes(), offset = 1, skip = TRUE) %>%
+  step_date(Year, features = "year") %>% # creating time predictors
+  step_rm(Year) %>%
+  step_normalize(all_numeric(), -all_outcomes()) %>%
+  step_dummy(Platform, Genre)%>%
+  step_pca(all_predictors())
+tidy(recipe_PCA,1)
+
+# Preping
+prepped_PCA <- recipe_PCA %>% 
+  prep()
+# View loadings
+tidy(prepped_PCA) # All steps completed
+tidy(prepped_PCA, 7) %>%
+  dim() # 2209 = 47*47 (all possible PCs)
+
+# Viewing relationship
+tidy(prepped_PCA, 7 ) %>% 
+  filter( component %in% c("PC1", "PC2", "PC3", "PC4") ) %>% 
+  group_by( component ) %>% 
+  top_n(10, abs(value) ) %>% 
+  ungroup() %>% 
+  ggplot( aes( x = abs(value), y = terms, fill = value > 0 ) ) +
+  geom_col(show.legend = TRUE) +
+  facet_wrap( ~ component, scales = "free") +
+  ggtitle(str_wrap("Figure 13:Importance of variables in the first four principal components", 45))+
+  ylab(NULL) # We do not need the y axis label.
+```
+
+According to the first PCA:
+
+-   PC1 showed Other_sales and EU_sales were important indicators (negatively correlated to NA_Sales)
+
+-   PC2 showed Year and platforms_available_for_title were important indicators (positively correlated with NA_Sales)
+
+-   PC3 convincingly showed Title_length was an important predictor, and Year to a lesser degree (negatively correlated with NA_Sales)
+
+-   PC4 showed JP_Sales was an important predictor (negatively correlated with NA_Sales).
+
+-   The dummy variables are difficult to comment on, but what we can say is no single Platform or genre on its own provided enough information ro represent the data independently (values were distributed).
+
+```{r, fig.width=6,fig.height=5}
+# Juice recipe to get principle components
+juiced_pca <- juice( prepped_PCA )
+juiced_pca %>% 
+  head()
+
+# Plot PC1 and PC2 for each subject
+juiced_pca %>% 
+  ggplot( aes( x = PC1, y = PC2, colour= NA_Sales)) +
+  geom_point() +
+  scale_colour_distiller()+
+  ggtitle(str_wrap("Figure 14: Principal component 1 loadings mapped against principal component 2 loadings with the additional variables, coloured by the value of NA_Sales", 45))
+```
+
+Figure 14 relates to figure 13. For PC1, loadings further to the left indicate above average values (due to normalization and negative loadings) of Other_Sales and JP_sales, while for PC2 lower loading values indicate above average values of Year and platforms_available_for_title.
+
+```{r, fig.width=6,fig.height=5}
+# Determining number of dimensions
+sdev <- prepped_PCA$steps[[7]]$res$sdev
+ve <- sdev^2 / sum(sdev^2) 
+ve # Total of 47
+
+  # Getting the portion of variance explained
+PC.pve <- tibble( 
+  pc = fct_inorder( str_c("PC", 1:47) ),
+  pve = cumsum( ve )) 
+
+  # visualizing PVE for each component
+PC.pve %>% 
+  ggplot( aes( x = pc, 
+               y = pve, 
+               fill = pve >= 0.9 ) ) + # Observing PCs that make up 90% of variability
+  geom_col() +
+  ggtitle(str_wrap("Figure 15: Determining the proportion of components required to explain 90% of the variance with the additional variables", 45)) +
+  ylab("Proportion of variance explained") +
+  xlab("Principal components") +
+  theme( axis.text.x = element_text( angle = 90 ) ) #rotate the x-axis labels
+```
+
+```{r, fig.width=6,fig.height=5}
+PC.pve %>% 
+  filter( pve >= 0.9)
+  # 15 components to explain at least 90% of the variance
+
+```
+
+There were 47 dimensions, 15 of which could be used to explain at least 90% of the variance. This is how dimension reduction is achieved in a PCA. However, the meaning of a principle component is ambiguous. It's perhaps best thought of as the relationship between the two variables that best explain the data. Each iteration is taken from a new plane, with different variables required to explain the positions. Each component should have a Root Mean Squared Error, RSME, than the last.
+
+Lets compare that to the PCA with just the initial variables:
+
+```{r, fig.width=6,fig.height=5}
+# Preparing data to suit the PCA
+PCA_initial_vars <- select(vgsales_df,  c(Platform, Genre, NA_Sales, EU_Sales,
+                                            JP_Sales, Other_Sales, Year )) 
+
+# Comparing against the initial variables
+# Recipe for PCA
+recipe_PCA_initial_vars <- recipe(NA_Sales ~., data = PCA_initial_vars ) %>%  
+  step_log(JP_Sales, EU_Sales, Other_Sales, offset = 1) %>% #Account for skew
+  step_log(all_outcomes(), offset = 1, skip = TRUE) %>%
+  step_date(Year, features = "year") %>% # creating time predictors
+  step_rm(Year) %>%
+  step_normalize(all_numeric(), -all_outcomes()) %>%
+  step_dummy(Platform, Genre)%>%
+  step_pca(all_predictors()) %>%
+  prep()
+
+# Viewing relationship
+tidy(recipe_PCA_initial_vars, 7 ) %>% 
+  filter( component %in% c("PC1", "PC2", "PC3", "PC4") ) %>% 
+  group_by( component ) %>% 
+  top_n(10, abs(value) ) %>% 
+  ungroup() %>% 
+  ggplot( aes( x = abs(value), y = terms, fill = value > 0 ) ) +
+  ggtitle(str_wrap("Figure 16: Importance of variables in the first four principle components", 45)) +
+  geom_col(show.legend = F) +
+  facet_wrap( ~ component, scales = "free") +
+  ylab(NULL) # We do not need the y axis label.
+```
+
+When it comes to the initial predictors, we see a similar story to that observed with the added variables:
+
+-   PC1 - Other_Sales and EU_Sales were important indicators of NA_Sales (negative correlation)
+
+-   PC2 - Year (negative correlation) and JP_Sales (positive correlation) were important indicators of NA_Sales
+
+-   PC3 - Year and JP_Sales were important indicators (positive correlation)
+
+-   PC4 - Other_Sales (negative correlation) and EU_Sales (positive correlation) were important indicators of NA_Sales
+
+-   No single dummy variable (genre or platform) was an important indicator of NA_Sales
+
+```{r, fig.width=6,fig.height=5}
+# Juice recipe to get principle components
+vgsales_juiced_initial_vars <- juice(recipe_PCA_initial_vars )
+vgsales_juiced_initial_vars %>% 
+  head()
+
+#Plot PC1 and PC2 for each subject
+vgsales_juiced_initial_vars %>% 
+  ggplot( aes( x = PC1, y = PC2, colour=NA_Sales ) ) +
+  geom_point() +
+  ggtitle(str_wrap( "Figure 17: Principal component 1 loadings mapped against principal component 2 loadings without the additional variables, coloured by the value of NA_Sales", 45 )) +
+  scale_colour_distiller()
+```
+
+Figure 16 and 17 are also related. PC1 loadings further to the left indicate above average values of Other_Sales and EU_Sales, while lower PC2 loadings indiate above average values of year but below average values of JP_Sales.
+
+```{r, fig.width=6,fig.height=5}
+# Determining number of dimensions
+sdev <- recipe_PCA_initial_vars$steps[[7]]$res$sdev
+ve <- sdev^2 / sum(sdev^2) 
+ve # Getting the portion of variance explained
+
+PC.pve_initial_vars <- tibble( pc = fct_inorder( str_c("PC", 1:45) ), 
+                  pve = cumsum(ve)) 
+
+# visualizing PVE for each component
+PC.pve_initial_vars %>% 
+  ggplot( aes( x = pc, 
+               y = pve, 
+               fill = pve >= 0.9 ) ) + 
+   ggtitle(str_wrap("Figure 18: Determining the proportion of components required to explain 90% of the variance with just the initial variables", 45)) +
+  ylab("Proportion of variance explained") +
+  xlab("Principal components") +
+  geom_col() +
+  theme( axis.text.x = element_text( angle = 90 ) ) #rotate the x-axis labels
+```
+
+```{r, fig.width=6,fig.height=5}
+PC.pve_initial_vars %>% 
+  filter( pve > 0.9)  # Let's look at those explaining 90% or more
+  # PC16 components to explain at least 90% of the variance
+
+# Altering recipe to use 36 components
+vgsales_16_comps_initial_vars <- recipe(NA_Sales ~ ., data = PCA_initial_vars ) %>%  
+  step_date(Year, features = "year") %>% # creating time predictors
+  step_rm(Year) %>%
+  step_normalize(all_numeric(), -all_outcomes()) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_pca(all_predictors(), num_comp = 16) %>%
+  prep()
+```
+
+In this instance, there were 45 dimensions of which only 16 were needed to explain 90% of the variance. To be clear, the first PCA had 47 dimensions reduced to 15, then in the second PCA there were only 45 dimensions reduced to 16. This implies that the added variables explained a good deal of the variance.
+
+```{r}
+NA_vs_Genre <- vgsales_df %>%
+  group_by(Genre, NA_Sales) %>%
+  tally() %>%
+  summarise(NthA_total = sum(NA_Sales*n)) %>%
+  arrange(desc(NthA_total ))
+knitr::kable(NA_vs_Genre)
+```
+
+## (Improvements I'd make if the marks justified it):
+
+-   Check importance with the party package.
+-   Could use the textrecipes library to add a step that creates a franchise predictor if :, -, 2, ii, etc. are present; a binary would be sufficient.
+-   Could obtain more data or find missing values.
+-   Could account for the fact that the population size (effectively the pool of customers) has increased over time (add together all sales for a five year period, then normalize to represent changes in the 'customer-scape').
+
+## References

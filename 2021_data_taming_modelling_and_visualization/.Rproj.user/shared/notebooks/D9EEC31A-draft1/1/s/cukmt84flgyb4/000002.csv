@@ -1,0 +1,8 @@
+"0","#2.1
+#Histogram default below, bin of 30
+ggplot(ac)+geom_histogram(aes(x=runs_, ), fill= ""black"", na.rm=TRUE) + 
+  ggtitle(""The Runs Achieved Over An Innings in the \n2017/18 Ashes Series"")+
+  labs(x= ""Scores reached"", y =""Frequency"")
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+"

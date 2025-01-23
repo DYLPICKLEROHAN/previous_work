@@ -1,0 +1,15 @@
+---
+title: "Untitled"
+author: "A1844790 - Dylan Rohan"
+date: '2022-03-28'
+output: word_document
+---
+```{r, fig.width=8,fig.height=4}
+library(ggplot2)
+ggplot(clean, aes(x = affair, y=as.integer(rate), fill=affair)) +
+  geom_boxplot(outlier.shape = 22, outlier.fill="#1b98e0") +
+  scale_fill_manual(values = c("#1b98e0", "violet"), breaks=waiver()) +
+  ggtitle("Figure 1: How loyal and disloyal participants rated \ntheir marriages") +
+  xlab("Respons to question 'Have you had an affair?'") +
+  ylab("rate\n\n(1=unhappy, 5=Very happy)\n")
+```

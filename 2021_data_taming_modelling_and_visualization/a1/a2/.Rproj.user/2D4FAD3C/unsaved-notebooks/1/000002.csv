@@ -1,0 +1,5 @@
+"0","pul_model <- lm(log(averafe_of_04_and_13) ~ prizes_9014, data = pulitzer)
+"
+"2","Error in eval(predvars, data, env) : 
+  object 'averafe_of_04_and_13' not found
+"

@@ -1,0 +1,23 @@
+```{r}
+library(tidyverse)
+library(dplyr)
+library(stringr)
+library(rmarkdown)
+
+ashes <- read_csv("C:\\Users\\rohad\\OneDrive\\Documents\\Data science\\Data Taming, modelling and Vizalization_RStudio\\a1\\a1\\ashes.csv")
+#double slashes for windows directory
+ashes
+#Checking the table, currently a tibble of 27 x 13
+unique(ashes$team)
+#need to correct variable English to be England
+unique(ashes$role)
+#many duplicates under alternate variable names, eg. bat, batsman, batting
+
+#1.1
+colnames(ashes)
+ashes_longform <- gather(ashes, key = "innings", value = "description", "Test 1, Innings 1" : "Test 5, Innings 2")
+ashes_longform
+#tibble now in long form, 270 x 5
+ashes_innings_first <- ashes_longform[c(4, 1, 2, 3, 5)]
+knitr::kable(head(ashes_innings_first))
+```

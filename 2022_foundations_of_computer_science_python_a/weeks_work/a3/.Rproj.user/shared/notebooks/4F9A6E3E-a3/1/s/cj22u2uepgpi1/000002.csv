@@ -1,0 +1,13 @@
+"0","predict(evap_model4, newdata = tibble(month = ""12"", min_t_C = 16.4, humid_9am = 57), interval = ""prediction"")
+"
+"1"," "
+"1","      fit"
+"1","      lwr"
+"1","      upr"
+"1","
+1"
+"1"," 8.346807"
+"1"," 3.920063"
+"1"," 12.77355"
+"1","
+"

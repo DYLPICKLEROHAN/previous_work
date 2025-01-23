@@ -1,0 +1,395 @@
+---
+title: "Assessment 2 -  Scaffolded case study"
+author: "A1844790 - Dylan Rohan"
+date: "17/11/2021"
+output: word_document
+---
+Email response:
+
+We can rationalize this in a few ways:
+1. Less people are rely on news vendors with social media and television.
+2. Few readers put much weight on pulitzer prizes when they concider which paper to buy.
+3. the authors of those prize winning articles may have been poached by 
+Appendix:
+```{r setup, include=FALSE}
+library(tidyverse)
+library(stringr)
+library(dplyr)
+pulitzer <- read_csv("C:\\Users\\rohad\\OneDrive\\Documents\\Data science\\Data Taming, modelling and Vizalization_RStudio\\a1\\a2\\pulitzer.csv")
+head(pulitzer)
+```
+# Question One: Reading and Cleaning
+### 1.1
+Recode the change_0413 variable so it represents the percentage change in circulation between 2004 and 2013 as an integer. This will require manipulating the strings in change_0413.
+
+```{r cars}
+pulitzer <- pulitzer%>%
+  mutate(perc_change = str_replace_all(pulitzer$change_0413, "%", ""))
+#remove % sign from change_0413 column
+pulitzer$perc_change <- as.integer(pulitzer$perc_change)
+#make percentage change an integer instead of a string
+pulitzer <- pulitzer[, c(1,2,3,5,6)]
+#Remove duplicate column
+head(pulitzer)
+```
+
+### 1.2
+Append a new variable to the tibble which contains the average of circ_2004 and circ_2013.
+
+```{r}
+colnames(pulitzer)
+pulitzer$average_of_04_and_13 <- rowMeans(pulitzer[ , c(2,3)], na.rm=TRUE)
+#Introducing a column for the average circulation over the decade
+pulitzer <- pulitzer[, c(1,4,2,3,5,6)]
+head(pulitzer)
+```
+
+## Question Two: Univariate Summaryand Transformation
+### 2.1 
+Describe the distribution of the variable representing average circulation, including shape, location, spread and outliers.
+```{r}
+ggplot(pulitzer, aes(average_of_04_and_13))+
+  geom_histogram()+
+  labs( title = "Right Skewed Histogram of the Average Circulation \nbetween 2004 and 2013",
+        x = "Average Circulation",
+        y = "Count"
+        )
+ggplot(pulitzer, aes(average_of_04_and_13))+
+  geom_boxplot()+
+  labs( title = "Boxplot Demonstrating Spread and Outlier Positions \nfor the Average Circulation between 2004 and 2013",
+        x = "Average Circulation"
+        )
+summary(pulitzer$average_of_04_and_13, na.rm = TRUE)
+sd(pulitzer$average_of_04_and_13)
+```
+
+Average circulation has a mean of 412442, standard deviation of 410340, an IQR of 222643, a median of 298851, and a domain of [131004, 2239922]. It is right skewed with  4 outliers, The wall street journal, USA today, New york times, and Los Angeles times. This indicates that the majority of newspapers reach a circulation of less than 600,000. These publishers are likely state specific, topic specific, or cannot penetrate the national market of readers for one reason or another.
+
+### 2.2
+Describe the distribution of perc_change, including shape, location, spread and outliers.
+```{r}
+ggplot(pulitzer, aes(perc_change))+
+  geom_histogram() +
+  labs( title = "Histogram Demonstrating Spread of the Percentage \nChange in Circulation between 2004 and 2013",
+        x = "Percentage Change of Circulation",
+        y = "Count"
+        )
+ggplot(pulitzer, aes(perc_change))+
+  geom_boxplot() +
+  labs( title = "Boxplot Demonstrating Spread and Outlier Positions \nfor the Percentage change in Circulation between 2004 \nand 2013",
+        x = "Percentage Change"
+        )
+summary(pulitzer$perc_change)
+unique(pulitzer$perc_change)
+sd(pulitzer$perc_change)
+
+#-------------#
+#What about removing the publishers that appear to be out of print, surely their data distorts the model too much?
+```
+The histogram is a little bit messy but it's vaguely centered, and multimodal. There are 5 outliers;	Rocky Mountain News, New Orleans Times-Picayune, Boston Herald, Detroit News, and San Francisco Chronicle. The Rocky Mountain News and New Orleans Times-Picayune both appear to be out of print with a percentage change of 100%. The data has a mean of -29.2%, IQR of 20.75%, domain of [-100, 67]. The median is -32.50%, with three instances each, the data is multimodal at -34%, -40%, and -44%. 
+
+When you remove those two data that represent two publishers that appear to be out of print from the population you have improved significance in later sections. I think there is a strong case for removing them because they misrepresent themselves; they did not go out of print on the final day of the decade nor did they have a whole 25 years to obtain Pulitzer prizes. Furthermore, papers distributed nationally also cause trouble, but the case for their removal requires a significant amount of research, more than is necessary for this assignment. To justify removing them you would need to show that there is a significant difference between papers with national circulation and those with a more limited reach. I think it's also possible that when those two publishers went out of print, it drastically increased the amount of readership in other papers that could fill that niche.
+
+So I introduce a data set for a third model below that excludes publishing companies that are out of print just to see what would happen:
+```{r}
+pul2 <- pulitzer %>%
+   filter( perc_change != "-100")
+#removes publishers that are out of print
+ggplot(pul2, aes(perc_change))+
+  geom_histogram() +
+  labs( title = "Histogram Demonstrating Spread and Outlier Positions for the percentage change \nbetween 2004 and 2013 when out-of-print publishers \nare excluded",
+        x = "Percentage Change",
+        y =  "Count"
+  )
+ggplot(pul2, aes(perc_change))+
+  geom_boxplot() +
+  labs( title = "Boxplot Demonstrating Spread and Outlier Positions for the Average Circulation\nbetween 2004 and 2013 when out-of-print publishers \nare excluded",
+        x = "Percentage Change"
+  )
+summary(pul2$perc_change)
+sd(pul2$perc_change)
+```
+
+Now the graph, appears more right skewed. You can also see how some of the publishers increased circulation by upwards of 10% while the majority reduced circulation. These are the four outliers; the New York Times, Denver Post, Orange County register, and the Wall street journal. The mean is -26.25%, IQR of 20.5%, and a domain of [-60, 67]
+
+### 2.3
+Do either of perc_change and the variable representing average circulation have a skew that could be resolved by a log transform? For each variable, select whether it should be transformed.
+```{r}
+#Right skew can be rectified with a log transformation but lets use BoxCoxTrans() to check it out.
+pacman::p_load(caret)
+BoxCoxTrans(pulitzer$prizes_9014, pulitzer$average_of_04_and_13)
+#lambda = 0, suggesting a ln(x+60) transformation
+BoxCoxTrans(pulitzer$prizes_9014, pulitzer$perc_change)
+#lambda = 0, suggesting a ln(x+60) transformation
+ggplot(pulitzer, aes(log(average_of_04_and_13)))+ 
+  geom_histogram()
+#Appears more normally distributed
+ggplot(pulitzer, aes(log(perc_change+101)))+ 
+         geom_histogram()
+#accounted for x<=0, the distribution is impaired by the value of x=-100%.
+ggplot(pul2, aes(log(perc_change+61)))+ 
+         geom_histogram()
+#accounted for x<=0, appears to be a near mirror image of the initial un-transformed histogram, probably not helpful
+#Now do they look more similar to our distribution of prizes_9014:
+ggplot(pulitzer, aes(prizes_9014))+
+  geom_histogram()
+#heavy right skew, nothing lower than 0 so transform by log(x+1).
+ggplot(pulitzer, aes(log(prizes_9014+1)))+
+  geom_histogram()
+ggplot(pulitzer, aes(prizes_9014))+
+  geom_histogram()
+#better distribution with the transformation.
+```
+The average_of_04_and_13 is right skewed and would benefit from a log transformation. As the data doesn't include any values of zero or less, it is sufficient to transform with the default ln(x). 
+
+The perc_change attribute is also right skewed but transforming by ln(x+101) does not alter the distribution in a way that could increase accuracy or predictive power. The same is true when considering the data of the pul2 model which, when transformed by ln(x+61), seems ro produce a near mirror image of the initial pulitzer data set. 
+
+
+Summary
+average circulation ---> transformation of ln(x)
+perc_change         ---> leave as is
+
+
+## Question Three: Model building and interpretation
+### 3.1
+Build a model predicting the variable representing a newspaper’s circulation using prizes_9014, incorporating a log transform for the average circulation if you decided this was necessary. State and interpret the slope and intercept of this model in context. Is there a statistically significant relationship between the number of Pulitzer Prizes, and average circulation? (Include this model in your email attachment, and include your interpretation in your email.)
+
+```{r}
+pul_model <- lm(log(average_of_04_and_13) ~ prizes_9014, data = pulitzer)
+summary(pul_model)
+
+#Just a quick look:
+ggplot(pulitzer, aes(log(average_of_04_and_13), prizes_9014)) +
+  geom_point()+
+  labs( title = "A Visualization of the log Transformed \nAverage against the Prize Count Attribute",
+        x= "ln(Average Circulation between 2004 and 2013)",
+        y = "Prize count")
+plot(log(pulitzer$average_of_04_and_13))
+plot(pulitzer$prizes_9014)
+#Didn't reveal anything that we didn't already know
+#now with pul2 data:
+pul_model_without_outliers <- lm(log(average_of_04_and_13) ~ (prizes_9014), data = pul2)
+summary(pul_model_without_outliers)
+#Doesn't seem to improve the model in any meaningful way.
+```
+Generally you want your y distribution to resemble your x distribution for better output. So prizes_9014 will remain un-transformed to match the right skew of the ln(average_of_04_and_13). (Interestingly this model has the best R^2 values which are measures of correlation and should not be taken to mean the model's predictive potential has improved, but it does indicate a stronger relationship.) 
+
+The intercept was at 12.463142, and the coefficient of the prizes_9014 was 0.014083. There does appear to be a significant relationship here with a p-value of 2x10^-16 for the intercept and 1.53x10^-5 for the coefficient of prizes_9014; well below 0.05. 
+
+In short, for every prize won, the average circulation will increase by (e^0.014083=) 1. 
+
+### 3.2 
+Build a model predicting perc_change using prizes_9014, incorporating a log transform for perc_change if you decided this was necessary. State and interpret the slope and intercept of this model in context. Is there a statistically significant relationship between the number of Pulitzer Prizes, and change in circulation?
+(Include this model in your email attachment, and include your interpretation in your email.)
+
+```{r}
+pul_model2 <- lm(perc_change ~ prizes_9014, data = pulitzer)
+summary(pul_model2)
+
+plot(pulitzer$perc_change)
+plot(pulitzer$prizes_9014)
+#log function on prizes_9014 was not significant.
+```
+The BoxCoxTrans() function suggested a transformation by the natural log. Making that transforamtion does however result in a p-value of 0.05185 which is of course above the acceptable significance threshold of 0.05. Without that transformation, pul_model2 is significant, with a p-value of 0.0121; which is below the acceptable limit of 0.05 (intercept's p-value is 1.21x10^-10, prize coefficient p-value is 0.0121). We'll use that model and see what comes of it going forward keeping in mind it misbehaves a little bit, the intercept is at -35.4152, and the coefficient of prizes_9014 is at 0.3870.
+
+In short, for every prize won, the perc_change will increase by 0.3870%.
+
+```{r}
+#Model 3, from pul2 data (no -100% perc changes)
+pul_model3 <- lm(perc_change ~ log(prizes_9014+1), data = pul2)
+summary(pul_model3)
+#In the model that excludes the -100% percentage changes, pul_model3, we see significance in the log transformed data. The p value of the intercept is 1.5x10^6, and the p-value of the coefficient is 0.0288; both below 0.05. 
+#Intercept -> -41.636
+#log(prizes_9014+1) -> 6.896
+#The r^2 values are not excellent, and in the next section we see that the assumptions aren't well satisfied.
+
+```
+
+### 3.3
+Check the assumptions of both linear models. Recall that there are four assumptions for each model.(Outline your assumptions in the email to your manager and include the assessment of these assumptions in the email attachment.)
+```{r}
+plot(pul_model, which = 1)
+plot(pul_model, which = 3)
+plot(pul_model, which = 2)
+
+plot(pul_model2, which = 1)
+plot(pul_model2, which = 3)
+plot(pul_model2, which = 2)
+
+#and for the model excluding out of print publishers:
+plot(pul_model3, which = 1)
+plot(pul_model3, which = 3)
+plot(pul_model3, which = 2)
+#the assumptions of linearity and homoscedascity don't hold up for pul_model3. 
+ggplot(pulitzer, aes(log(average_of_04_and_13), prizes_9014))+
+  geom_point()
+```
+The assumptions being made are:
+1. linearity - we assume that a straight line is the best model to use to represent the relationship between variables.
+
+To confirm this assumption, we should see a fairly horizontal line on a plot of fitted values against residuals. For pul_model, there is good linearity considering the scale of the y-axis. While the curve looks worse in pul_model2, the bulk of the data behaves well and it looks to be only a few data points towards the end that cause the trouble. I favour the pul_model over the pul_model2 because the assumption of linearity appears more accurate, that doesn't immediately disqualify pul_model2 but we must keep this in mind while exploring these models further.
+
+2. Homoscedacity - We assume that the noise in the data is consistent over the domain with the same variance.
+
+For this to be true we should see a fairly horizontal line on a plot of fitted value against (standardized residuals)^1/2. For pul_model, there is a fairly horizontal line over the domain of interest. In pul_model2, the line quite clearly has a positive linear trend but again the bulk of the data shows no specific trend.
+
+3. A normal distribution of noise - we assume the noise is normally distributed and doesn't increase or decrease across the domain.
+
+We would expect linearity on the domain of [-2,2]. On the plots of theorized quantiles against standardized residuals, we clearly see that both models vear away from linearity inside that domain, therefore the assumption of normality is not well supported. However, it again seems to be only the outliers causing the movement from linearity.
+
+4. Independence - We assume all error is independent of the variable and not influenced by it in any way.
+
+I think there is a lot to unpack when it comes to the assumption of independence. The assumption we're making is that noise and error act separately to the average circulation values. So the question is What kind of noise or error can there be around circulation numbers and prize counts? How could observations from one Newspaper give us more information about another?
+
+1. Customer dynamics - First of all when one paper goes out of print, It's highly likely that their proportion of readers will move to a different publisher. Customer dynamics relate these values over the period with the publishers included and perhaps many that are not.
+
+2. Contents/ marketing - Another thing that relates these papers are their contents. For example, if I'm the type of person that goes to the news agent to buy my daily paper, occasionally the bigger publishers will convince me to buy their paper instead with a story so big and recent that only a firm of their size and with their resources could provide. When I see the front page story about the volcanic eruptions in Antarctica, or the discovery of Atlantis, I'm likely to either put down my usual newspaper and buy that one or buy both papers. That's one way we may have dependence in the data which relates to contents and marketing. If the bigger paper has a better story, less smaller papers will sell. This will happen multiple times a year, clearly adding noise to the data.
+
+3. reader to paper ratio - Another way there may be dependence has increased over the last decade. One individual that buys multiple papers from different publishers whenever they get the paper. This has likely become more confounding with online newspapers. It is not clear to me whether or not online readers that pay for the membership are included in circulation numbers. But if they are, that certainly opens up room for noise as an individual that no longer has to pay 2.50 for the paper each morning can now afford a monthly subscription to multiple papers at a lower monthly cost. There is a dependency attached to these individuals because the circulation of one will go up with the circulation of another just because the individual decides to get news access.
+
+4. Readership and Distribution - Using circulation as a measure of success will distort the model because it does not consider the population size. For example, I imagine the 'USA Today' is available in multiple states, but good luck finding the "Daily Oklahoma' anywhere but in Oklahoma. The reach some papers can get is limited for geographical or content reasons. I would be surprised if '(circulation)/ (population of news readers in areas of distribution)' didn't produce a more accurate model. After all, the Pulitzer prize is awarded for excellence in newspaper journalism, not the size of the publishing company. We should compare the proportions of newspapers distribution to express a measure of captivating writing. 
+
+5. Available awards - There are only 24 pulitzer prizes awarded each year so when I take one that leaves n-1 pulitzer prizes. In this way, an observation for paper A can give you information about paper B.
+
+
+## Question Four: Prediction
+Incorporate your answers from this question in your email to your manager.
+Masthead Media is considering three strategic directions for the Boston Sun-Times. These are:
+●Investing substantially less in investigative journalism than present. In this case, Masthead Media projects that the newspaper will be awarded 3 Pulitzer Prizes in the next 25 years.
+●Investing the same amount in investigative journalism than present, leading to the award of 25 Pulitzer Prizes in the next 25 years.
+●Investing substantially more in investigative journalism, leading to the award of 50 Pulitzer Prizes.
+For the following questions, assume that the projected number of prizes under each possible strategic direction is known; that is, do not incorporate any uncertainty in the number of Pulitzer Prizes.
+
+### 4.1
+Using the model from Question 3.1, calculate the expected circulation of the newspaper under each of the three proposed strategic directions. How does this compare with the current circulation?
+```{r}
+#pul_model <- lm(log(average_of_04_and_13) ~ prizes_9014, data = pulitzer)
+predict(pul_model, newdata= tibble(prizes_9014 =3))
+predict(pul_model, newdata= tibble(prizes_9014 =25))
+predict(pul_model, newdata= tibble(prizes_9014 =50))
+
+ggplot(pulitzer, aes(prizes_9014, log(average_of_04_and_13)))+
+  geom_point()+
+  geom_smooth(aes(group=1), method="lm", se=FALSE, col = "black")+
+  labs( title = "The Linear Regression Model produced by \npul_model data",
+        x ="Prize count",
+        y = " ln(Average circulation between 2004 and 2013)")
+  
+```
+F(3)  = log(average_of_04_and_13) = 12.50539, or a total average circulation of 269,788.
+F(25) = log(average_of_04_and_13) = 12.81522, or a total average circulation of 367,773.
+F(50) = log(average_of_04_and_13) = 13.1673 , or a total average circulation of 522,981.
+
+Currently the circulation is 453,869, with a single Pulitzer prize awarded every year; or 25 over 25 years. The model indicates that following that trend will be insufficient to maintain the current circulation average.
+
+
+### 4.2
+Using the model from Question 3(b), calculate the change in circulation of the newspaper, across the next decade, under each of the three proposed strategic directions. Comment on whether the projections of each of the two models are consistent.
+```{r}
+#pul_model2 <- lm(perc_change ~ prizes_9014, data = pulitzer)
+predict(pul_model2, newdata= tibble(prizes_9014 =3))
+predict(pul_model2, newdata= tibble(prizes_9014 =25))
+predict(pul_model2, newdata= tibble(prizes_9014 =50))
+
+ggplot(pulitzer, aes(prizes_9014, perc_change))+
+  geom_point()+
+  geom_smooth(aes(group=1), method="lm", se=FALSE, col = "black") +
+  labs( title = "The Linear Regression Model produced by \npul_model2 data",
+        x ="Prize count",
+        y = "%change in circulation from 2004 to 2013")
+```
+F(3)  = log(average_of_04_and_13) = -34.25423, or a total average circulation of 1x10^-15
+F(25) = log(average_of_04_and_13) = -25.74021, or a total average circulation of 6.6x10^-12
+F(50) = log(average_of_04_and_13) = -16.06518,  or a total average circulation of 1.1x10^-7.
+
+The model is not consistent with the previous model. The coefficients are considerably different, so the outputs differ markedly. 
+
+### 4.3
+Using the model from Question 3(a), calculate 90% confidence intervals for the expected circulation of the newspaper under each of the three proposed strategic directions. Place these confidence intervals in a table and contrast them in context.
+```{r}
+predict(pul_model, newdata= tibble(prizes_9014 =3), interval = "confidence")
+predict(pul_model, newdata= tibble(prizes_9014 =25), interval = "confidence")
+predict(pul_model, newdata= tibble(prizes_9014 =50), interval = "confidence")
+
+predict(pul_model, newdata= tibble(prizes_9014 =3), interval = "prediction")
+predict(pul_model, newdata= tibble(prizes_9014 =25), interval = "prediction")
+predict(pul_model, newdata= tibble(prizes_9014 =50), interval = "prediction")
+
+condifence_interval_pul_model <- tibble(
+  model = c("pul_model", "pul_model", "pul_model"),
+  prize_count = c(3, 25, 50),
+  fit = c(2.71828^12.50539, 2.71828^12.81522, 2.71828^13.1673),
+  lwr = c(2.71828^12.34252, 2.71828^12.6623, 2.71828^12.92128),
+  upr = c(2.71828^12.66826, 2.71828^12.96815, 2.71828^13.41333),
+  range = c(upr-lwr),
+)
+head(condifence_interval_pul_model)
+
+prediction_interval_pul_model <- tibble(
+  model = c("pul_model", "pul_model", "pul_model"),
+  prize_count = c(3, 25, 50),
+  fit = c(2.71828^12.50539, 2.71828^12.81522, 2.71828^13.1673),
+  lwr = c(2.71828^11.47712, 2.71828^11.78848, 2.71828^12.12262),
+  upr = c(2.71828^13.53367, 2.71828^13.84197, 2.71828^14.21198),
+  range = c(upr-lwr),
+)
+head(prediction_interval_pul_model)
+```
+In looking at the above table, whats clear about the pul_model is that the more Pulitzer prizes you input, the less sure of the prediction you can be. The confidence interval expresses the range of values you'll need to include in order to be 95% certain the true answer is present within the range. The range is the difference between the upper and lower bounds, when it gets larger, it means the certainty of the prediction is reducing.
+
+Confidence intervals are about the population, prediction intervals are about the individual. In comparing the two, our certainty around prediction intervals is much lower than confidence intervals as demonstrated by the magnitude of range values required to have a probability of including the true value at 95%.
+
+
+### 4.4
+Using the model from Question 3(b), calculate 90% prediction intervals for the expected change in circulation of the newspaper under each of the three proposed strategic directions. Place these prediction intervals in a table and contrast them in context.
+```{r}
+predict(pul_model2, newdata= tibble(prizes_9014 =3), interval = "prediction", level=0.9)
+predict(pul_model2, newdata= tibble(prizes_9014 =25), interval = "prediction", level= 0.9)
+predict(pul_model2, newdata= tibble(prizes_9014 =50), interval = "prediction", level=0.9)
+
+prediction_interval_pul_model2 <- tibble(
+  model = c("pul_model", "pul_model", "pul_model"),
+  prize_count = c(3, 25, 50),
+  fit = c(2.71828^-34.25423 , 2.71828^-25.74021 , 2.71828^-16.06518 ),
+  lwr = c(2.71828^-77.72971  , 2.71828^-69.15107 , 2.71828^-60.23418 ),
+  upr = c(2.71828^9.221238  , 2.71828^17.67065 , 2.71828^28.10381),
+  range = c(upr-lwr),
+)
+prediction_interval_pul_model2
+```
+This model has had it's issues from the start (outlier concerns, difficulty in reaching significance, poor verification of assumptions, etc). It's saying here that to be 90% certain of an individual within the population achieving any of those prize inputs will sit between 0 and over 10,000. 
+
+## Question Five: Limitations
+Incorporate your answers from this question in your email to your manager. 
+### 5.1
+Discuss what limitations there might be to each of the models. Why might this model be insufficient for its application? You should discuss at least two limitations of these models in application.
+```{r}
+filter(pulitzer, perc_change >= 0)
+```
+There are a few things that make these models insufficient for our purposes:
+The data doesn't consider distribution, geography, or the reasonable expected reach of each paper as I spoke to earlier. It also hasn't considered the many outside factors that come along with the passage of time such as social media and online news outlets which offer real-time and economic advantages to readers. Furthermore, people generally aren't aware that a news paper even won an award, perhaps there are better measures of good journalism and marketing.
+
+Of the 50 publishers, only 6 papers had a positive change in circulation over the last decade:
+-Wall street Journal, with 51 prizes won
+-new york times, with 118 prizes won
+-San jose Mercury News, with 7 prizes won
+-Chicargo Sun-Times, with 3 prizes won
+-Denver post, with 10 prizes won
+-orange county register,with 6 prizes won
+There were several publishers that won more than those listed above so there is clearly a better measure of change in circulation than the Pulitzer prize count over the last 25 years. Adding weighting to more recent Pulitzers may help, but even then I expect a better variable is available.
+
+In terms of limitations, the model assumes these businesses are machines that operate the same way every time. However a prize winning journalist can always resign and new talent can always arise. It cannot account for these changes or their influence on readership. 
+
+It also assumes the world will continue to act with the same motivations today as they did yesterday over long periods of time. But the type of news people really need today is changing, Covid19 has made that quite clear. In Australia, Television, radio, and the internet provided people with news on restrictions. News papers were incapable of providing the same type of support or reaching the same magnitude of people as restrictions prevented them from doing so. A trend the model could not hope to account for. 
+
+#### References:
+
+```{r}
+citation()
+citation("tidyverse")
+citation("stringr")
+citation("dplyr")
+citation("caret")
+```
+
+

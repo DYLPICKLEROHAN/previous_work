@@ -1,0 +1,6 @@
+"0","#accounted for x<=0, the distribution is impaired by the value of x=-100%.
+ggplot(pul2, aes(log(perc_change+61)))+ 
+         geom_histogram()
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+"

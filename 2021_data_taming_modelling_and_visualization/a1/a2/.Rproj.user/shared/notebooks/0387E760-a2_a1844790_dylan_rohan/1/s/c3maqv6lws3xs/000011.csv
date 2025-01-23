@@ -1,0 +1,9 @@
+"0","ggplot(pulitzer, aes(average_of_04_and_13))+
+  geom_histogram()+
+  labs( title = ""Right Skewed Histogram of the Average Circulation \nbetween 2004 and 2013"",
+        x = ""Average Circulation"",
+        y = ""Count""
+        )
+"
+"2","`stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+"

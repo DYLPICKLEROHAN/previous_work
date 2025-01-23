@@ -1,0 +1,13 @@
+"0","pulitzer <- pulitzer%>%
+  mutate(perc_change = str_replace_all(pulitzer$change_0413, ""%"", """"))
+"
+"2","Warning:"
+"2"," Problem with `mutate()` column `perc_change`.
+[34mi[39m `perc_change = str_replace_all(pulitzer$change_0413, ""%"", """")`.
+[34mi[39m Unknown or uninitialised column: `change_0413`.
+"
+"2","Error: Problem with `mutate()` column `perc_change`.
+[34mi[39m `perc_change = str_replace_all(pulitzer$change_0413, ""%"", """")`.
+[34mi[39m `perc_change` must be size 50 or 1, not 0.
+[90mRun `rlang::last_error()` to see where the error occurred.[39m
+"

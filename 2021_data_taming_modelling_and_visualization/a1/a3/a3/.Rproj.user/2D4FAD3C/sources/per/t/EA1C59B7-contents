@@ -1,0 +1,56 @@
+---
+title: "Untitled"
+author: "A1844790 - Dylan Rohan"
+date: "02/12/2021"
+output: word_document
+---
+
+```{r}
+library("tidyverse")
+library("dplyr")
+library("lubridate")
+library("stringr")
+library("inspectdf")
+library("olsrr")
+vars<- mwc[,c( "evap_mm", "month", "day", "min_t_C", "max_t_C", "humid_9am")]
+vars <- vars %>%
+  mutate(maxtemp = (max_t_C)^-0.3, rh_morn = (humid_9am)^1.4)
+vars <- tibble(vars)
+
+ggplot(vars, aes(x = evap_mm, maxtemp)) + 
+  geom_point()+
+  labs( title = "Chart revealing a moderate linear relationship \nbetween Evaporation and translated Maximum Temperature",
+        x = "Evaporation (mm)",
+        y = "(Maximum Temperature)^-0.3")
+
+ggplot(vars, aes(maxtemp)) + 
+  geom_histogram(binwidth=0.02) +
+  labs( title = "Chart revealing the Right-Skew nature of the \n translated Maximum Temperature Data",
+        x = "(Maximum Temperature)^-0.3",
+        y = "Frequency")
+
+ggplot(vars, aes(maxtemp)) + 
+  geom_boxplot() +
+  labs( title = "Chart revealing the outliers and spread of the \ntranslated Maximum Temperature Data",
+        x = "(Maximum Temperature)^-0.3")
+
+ggplot(vars, aes(x = evap_mm, rh_morn)) + geom_point() + 
+  labs( title = "Chart revealing the Moderate Strength, Negative Linear \nRelationship between Evaporation and the \nRelative Humidity at 9am",
+        x = "Evaporation (mm)",
+        y = "(Relative Humidity at 9am)^1.4")
+#evap (Quant) vs humid_9am (quant) (scatter plot)
+# indeed, higher humidity results in less evaporation, moderate negative linear trend with a few outliers 
+
+ggplot(vars, aes(rh_morn)) + 
+  geom_boxplot() +
+  labs( title = "Chart revealing the outliers and spread of the \nTranslated Relative Humidity at 9am data",
+        x = "(Relative Humidity at 9am)^1.4")
+
+ggplot(vars, aes(rh_morn)) + 
+  geom_histogram() +
+  labs( title = "Chart revealing the multimodal and centered \nnature of the translated Relative Humidity data",
+        x = "(Relative Humidity at 9am)^1.4",
+        y = "Frequency")
+
+```
+

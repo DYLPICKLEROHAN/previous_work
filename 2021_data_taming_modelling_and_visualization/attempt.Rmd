@@ -1,0 +1,125 @@
+---
+title: "Assessment 1 – Data set"
+author: "A1844790 - Dylan Rohan"
+date: "04/11/2021"
+output: word_document
+---
+
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(stringr)
+ashes <- read_csv("C:\\Users\\rohad\\OneDrive\\Documents\\Data science\\Data Taming, modelling and Vizalization_RStudio\\a1\\a1\\ashes.csv")
+#double slashes for windows directory
+ashes <- read_csv("ashes.csv")
+#testing something mentioned in the discussion board, neat!
+ashes
+#Checking the table, currently a tibble of 27 x 13
+unique(ashes$team)
+#need to correct variable English to be England
+unique(ashes$role)
+#many duplicates under alternate variable names, eb. bat, batsman, batting
+```
+
+## Question One: Reading and Cleaning
+##### 1.1
+(Note: I finished the assignment very early, so I went back and put the code in for the way the course probably expected to see it as well.)
+
+1.1)	For our analysis, the subjects are not the cricketers themselves, but each batting innings they participated in. In order to make the data tidy each subject needs its own row. Rearrange the data into a long format so that there is a row for each batter in each innings. Your new tibble should have 270 rows. 
+[2 points] 
+
+Each cell should represent only one measurement. Use str_match() to create new columns for each of the following for each player innings: 
+*	the player’s batting number
+*	their score
+*	the number of balls they faced. 
+[2 points] 
+
+
+```{r}
+colnames(ashes)
+ashes_longform <- gather(ashes, key = "innings", value = "description", "Test 1, Innings 1" : "Test 5, Innings 2")
+ashes_longform
+#tibble now in long form, 270 x 5
+ashes_innings_first <- ashes_longform[c(4, 1, 2, 3, 5)]
+ashes_innings_first
+#tibble now in long form with subject first
+
+```
+
+##### 1.2
+1.2)	Recode the data to make it ‘tame’, that is:
+*	ensure all categorical variables with a small number of levels are coded as factors, 
+*	ensure all categorical variables with a large number of levels are coded as characters,
+* ensure all quantitative variables are coded as integers or numeric, as appropriate. 
+[3 points] 
+
+```{r}
+colnames(ashes)
+ashes_longform <- gather(ashes, key = "innings", value = "description", "Test 1, Innings 1" : "Test 5, Innings 2")
+ashes_longform
+#tibble now in long form, 270 x 5
+ashes_innings_first <- ashes_longform[c(4, 1, 2, 3, 5)]
+ashes_innings_first
+#tibble now in long form with subject first
+
+```
+##### 1.3
+Clean the data; recode the factors using fct_recode() such that there are no typographical errors in the team names and player roles. 
+[2 points] 
+
+
+```{r}
+order <- str_match(ashes_innings_first$description, "Batting at number ..")
+with_order <- cbind(ashes_innings_first, order)
+with_order
+#Order now has its own column
+runs <- str_match(with_order$description, "scored ....")
+runs
+with_runs <- cbind(with_order, runs)
+#runs now has its own column
+no._of_balls <- str_match(with_runs$description, "from ....")
+no._of_balls
+all_columns<- cbind(with_runs, no._of_balls)
+#no.  of balls now has its own column
+batting_order <- str_replace_all(all_columns$order, "[^0-9.-]", "")
+runs_ <- str_replace_all(all_columns$runs, "[^0-9.-]", "")
+balls_ <- str_replace_all(all_columns$no._of_balls, "[^0-9.-]", "")  
+#Taking numerical values from strings
+order1 <- tibble(batting_order)
+runs1 <- tibble(runs_)
+balls1 <- tibble(balls_)
+#making data frames from those values
+a1_o <- cbind(ashes_innings_first, order1)
+a1_o_r <- cbind(a1_o, runs1)
+a1_o_r_b<- cbind(a1_o_r, balls1)
+#Order same, so binding columns
+a1o_r_b <- a1_o_r_b$description <- NULL
+a1_o_r_b <- a1_o_r_b %>%
+  mutate_all(na_if, "")
+#removing description column
+a1_o_r_b
+#now a tibble of 270 x 7 (removed description, but unused data is still accessible in "ashes_innings_first')
+  
+
+  #_______________________________________________________#
+#WAS A KEEN BEEN, SO ALTERNATIVELY:
+
+trial <- ashes_innings_first %>%
+  mutate("runs_"=str_match(description,"from ....") , "batting_order" = str_match(description, "Batting at number .."), "balls_" = str_match(description, "scored ...."))
+#description string broken into appropriate columns
+trial <- trial %>%
+  mutate("runs_" = str_replace_all(trial$runs_, "[^0-9.-]",""), "balls_"=str_replace_all(trial$balls_, "[^0-9.-]",""), "batting_order"=str_replace_all(trial$batting_order, "[^0-9.-]",""))
+  mutate_all(trial, na_if, "") %/%
+#Left the description column in here, but all is right with the world
+trial
+   # _______________________________________________________#
+```
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
